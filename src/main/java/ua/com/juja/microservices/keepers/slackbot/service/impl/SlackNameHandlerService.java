@@ -44,6 +44,7 @@ public class SlackNameHandlerService {
 
     public SlackParsedCommand createSlackParsedCommand(String fromUser, String text) {
         if (!fromUser.startsWith("@")) {
+            fromUser = "@" + fromUser;
             logger.debug("add '@' to slack name [{}]", fromUser);
         }
         Map<String, UserDTO> usersMap = receiveUsersMap(fromUser, text);

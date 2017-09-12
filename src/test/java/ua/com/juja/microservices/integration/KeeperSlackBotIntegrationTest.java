@@ -47,6 +47,8 @@ public class KeeperSlackBotIntegrationTest {
     private static final String IN_PROGRESS = "In progress...";
     private static final String EXAMPLE_URL = "http://example.com";
     private static final String TOKEN_WRONG = "wrongSlackToken";
+    private static final String FROM_USER_SLACK_NAME_WITHOUT_AT = "from-user";
+
     @Value("${keepers.slackBot.slack.slashCommandToken}")
     private String tokenCorrect;
 
@@ -117,6 +119,43 @@ public class KeeperSlackBotIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(MockMvcResultMatchers.content().string(IN_PROGRESS));
     }
+
+    @Test
+    public void onReceiveSlashCommandKeeperAddWhenFromUserSlackNameWithoutATSendOkRichMessage() throws Exception {
+        //Given
+        final String KEEPER_ADD_COMMAND_TEXT = "@slack1 teams";
+        final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
+        final String EXPECTED_REQUEST_TO_KEEPERS = "{" +
+                "\"from\":\"f2034f11-561a-4e01-bfcf-ec615c1ba61a\"," +
+                "\"uuid\":\"f2034f22-562b-4e02-bfcf-ec615c1ba62b\"," +
+                "\"direction\":\"teams\"" +
+                "}";
+        final String EXPECTED_RESPONSE_FROM_KEEPERS= "[\"1000\"]";
+        final String EXPECTED_REQUEST_TO_SLACK = "{" +
+                "\"username\":null," +
+                "\"channel\":null," +
+                "\"text\":\"Thanks, we added a new Keeper: @slack1 in direction: teams\"," +
+                "\"attachments\":null," +
+                "\"icon_emoji\":null," +
+                "\"response_type\":null" +
+                "}";
+
+        //When
+        mockSuccessUsersService(usersInCommand);
+        mockSuccessKeepersService(urlBaseKeepers + keepersVersion + urlKeepers, HttpMethod.POST,
+                EXPECTED_REQUEST_TO_KEEPERS, EXPECTED_RESPONSE_FROM_KEEPERS);
+        mockSuccessSlack(EXAMPLE_URL, HttpMethod.POST, EXPECTED_REQUEST_TO_SLACK);
+
+        //Then
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(slackBotVersion + "/commands/keeper/add"),
+                SlackUrlUtils.getUriVars(FROM_USER_SLACK_NAME_WITHOUT_AT, tokenCorrect, "/keeper-add",
+                        KEEPER_ADD_COMMAND_TEXT))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.content().string(IN_PROGRESS));
+    }
+
+
 
     @Test
     public void onReceiveSlashCommandKeeperAddIncorrectTokenShouldSendSorryRichMessage() throws Exception{

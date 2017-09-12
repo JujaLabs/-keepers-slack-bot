@@ -30,4 +30,17 @@ public class SlackUrlUtils {
                 description,
                 "http://example.com"};
     }
+
+    public static Object[] getUriVars(String fromUser, String slackToken, String command, String description) {
+        return new Object[]{slackToken,
+                "any_team_id",
+                "any_domain",
+                "UHASHB8JB",
+                "test-channel",
+                "UNJSD9OKM",
+                fromUser,
+                command,
+                description,
+                "http://example.com"};
+    }
 }

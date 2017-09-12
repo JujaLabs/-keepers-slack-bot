@@ -18,6 +18,8 @@ import java.util.List;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 /**
  * @author Nikolay Horushko
@@ -84,5 +86,21 @@ public class SlackNameHandlerServiceTest {
         SlackParsedCommand actual = slackNameHandlerService.createSlackParsedCommand(userFrom.getSlack(), text);
         //then
         assertEquals(expected, actual);
+    }
+
+    @Test
+    public void shouldAddATToFromUserIfFromUserWithoutAT(){
+        //given
+        String text = "SomeText " + user1.getSlack();
+        List<String> requestToUserService = Arrays.asList(user1.getSlack(), userFrom.getSlack());
+        List<UserDTO> responseFromUserService = Arrays.asList(userFrom, user1);
+        when(userService.findUsersBySlackNames(requestToUserService)).thenReturn(responseFromUserService);
+        //when
+        String expected = "@slackFrom";
+        SlackParsedCommand actual = slackNameHandlerService.createSlackParsedCommand("slackFrom", text);
+        //then
+        assertEquals(expected, actual.getFromUser().getSlack());
+        verify(userService).findUsersBySlackNames(requestToUserService);
+        verifyNoMoreInteractions(userService);
     }
 }
