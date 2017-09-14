@@ -29,7 +29,9 @@ import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.springframework.http.MediaType.APPLICATION_JSON_UTF8;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -96,7 +98,7 @@ public class KeeperSlackBotIntegrationTest {
                 "\"uuid\":\"f2034f22-562b-4e02-bfcf-ec615c1ba62b\"," +
                 "\"direction\":\"teams\"" +
                 "}";
-        final String EXPECTED_RESPONSE_FROM_KEEPERS= "[\"1000\"]";
+        final String EXPECTED_RESPONSE_FROM_KEEPERS = "[\"1000\"]";
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
@@ -130,7 +132,7 @@ public class KeeperSlackBotIntegrationTest {
                 "\"uuid\":\"f2034f22-562b-4e02-bfcf-ec615c1ba62b\"," +
                 "\"direction\":\"teams\"" +
                 "}";
-        final String EXPECTED_RESPONSE_FROM_KEEPERS= "[\"1000\"]";
+        final String EXPECTED_RESPONSE_FROM_KEEPERS = "[\"1000\"]";
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
@@ -156,11 +158,10 @@ public class KeeperSlackBotIntegrationTest {
     }
 
 
-
     @Test
-    public void onReceiveSlashCommandKeeperAddIncorrectTokenShouldSendSorryRichMessage() throws Exception{
+    public void onReceiveSlashCommandKeeperAddIncorrectTokenShouldSendSorryRichMessage() throws Exception {
         //Then
-         mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(slackBotVersion + "/commands/keeper/add"),
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(slackBotVersion + "/commands/keeper/add"),
                 SlackUrlUtils.getUriVars(TOKEN_WRONG, "/keeper-add", "AnyText"))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isOk())
@@ -256,7 +257,7 @@ public class KeeperSlackBotIntegrationTest {
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"Oops something went wrong :(\"," +
+                "\"text\":\"very big and scare error\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
                 "\"response_type\":null" +
@@ -343,7 +344,7 @@ public class KeeperSlackBotIntegrationTest {
                 "\"uuid\":\"f2034f22-562b-4e02-bfcf-ec615c1ba62b\"," +
                 "\"direction\":\"teams\"" +
                 "}";
-        final String EXPECTED_RESPONSE_FROM_KEEPERS= "[\"1000\"]";
+        final String EXPECTED_RESPONSE_FROM_KEEPERS = "[\"1000\"]";
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
@@ -355,7 +356,7 @@ public class KeeperSlackBotIntegrationTest {
 
         //When
         mockSuccessUsersService(usersInCommand);
-        mockSuccessKeepersService(urlBaseKeepers + keepersVersion + urlKeepers,  HttpMethod.PUT, EXPECTED_REQUEST_TO_KEEPERS,
+        mockSuccessKeepersService(urlBaseKeepers + keepersVersion + urlKeepers, HttpMethod.PUT, EXPECTED_REQUEST_TO_KEEPERS,
                 EXPECTED_RESPONSE_FROM_KEEPERS);
         mockSuccessSlack(EXAMPLE_URL, HttpMethod.POST, EXPECTED_REQUEST_TO_SLACK);
 
@@ -368,7 +369,7 @@ public class KeeperSlackBotIntegrationTest {
     }
 
     @Test
-    public void onReceiveSlashCommandKeeperDeactivateIncorrectTokenShouldSendSorryRichMessage() throws Exception{
+    public void onReceiveSlashCommandKeeperDeactivateIncorrectTokenShouldSendSorryRichMessage() throws Exception {
         //Then
         mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(slackBotVersion + "/commands/keeper/deactivate"),
                 SlackUrlUtils.getUriVars(TOKEN_WRONG, "/keeper-deactivate", "AnyText"))
@@ -466,7 +467,7 @@ public class KeeperSlackBotIntegrationTest {
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"Oops something went wrong :(\"," +
+                "\"text\":\"very big and scare error\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
                 "\"response_type\":null" +
@@ -553,7 +554,7 @@ public class KeeperSlackBotIntegrationTest {
                 "\"uuid\":\"f2034f22-562b-4e02-bfcf-ec615c1ba62b\"," +
                 "\"direction\":\"\"" +
                 "}";
-        final String EXPECTED_RESPONSE_FROM_KEEPERS= "[\"direction1, direction2\"]";
+        final String EXPECTED_RESPONSE_FROM_KEEPERS = "[\"direction1, direction2\"]";
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
@@ -587,7 +588,7 @@ public class KeeperSlackBotIntegrationTest {
                 "\"uuid\":\"f2034f22-562b-4e02-bfcf-ec615c1ba62b\"," +
                 "\"direction\":\"\"" +
                 "}";
-        final String EXPECTED_RESPONSE_FROM_KEEPERS= "[]";
+        final String EXPECTED_RESPONSE_FROM_KEEPERS = "[]";
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
@@ -612,7 +613,7 @@ public class KeeperSlackBotIntegrationTest {
     }
 
     @Test
-    public void onReceiveSlashCommandKeeperGetDirectionsIncorrectTokenShouldSendSorryRichMessage() throws Exception{
+    public void onReceiveSlashCommandKeeperGetDirectionsIncorrectTokenShouldSendSorryRichMessage() throws Exception {
         //Then
         mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(slackBotVersion + "/commands/keeper"),
                 SlackUrlUtils.getUriVars(TOKEN_WRONG, "/keeper", "AnyText"))
@@ -629,7 +630,7 @@ public class KeeperSlackBotIntegrationTest {
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"Oops something went wrong :(\"," +
+                "\"text\":\"very big and scare error\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
                 "\"response_type\":null" +
