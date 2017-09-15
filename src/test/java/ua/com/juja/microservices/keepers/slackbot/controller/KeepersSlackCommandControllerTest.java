@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 import ua.com.juja.microservices.keepers.slackbot.service.KeeperService;
 import ua.com.juja.microservices.utils.SlackUrlUtils;
@@ -117,6 +118,32 @@ public class KeepersSlackCommandControllerTest {
         verifyNoMoreInteractions(keeperService, restTemplate);
 
         assertTrue(richMessageCaptor.getValue().getText().contains(ERROR_MESSAGE));
+    }
+
+    @Test
+    public void onReceiveSlashKeeperAddWhenUsersServiceUnavailableShouldSendExceptionMessage() throws Exception {
+        // given
+        final String KEEPER_ADD_COMMAND_TEXT = "@slack1 teams";
+        ResourceAccessException exception = new ResourceAccessException("Some service unavailable");
+        ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
+
+        // when
+        when(keeperService.sendKeeperAddRequest(any(String.class), any(String.class)))
+                .thenThrow(exception);
+        when(restTemplate.postForObject(anyString(), any(RichMessage.class), anyObject())).thenReturn("[OK]");
+
+        // then
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(version + "/commands/keeper/add"),
+                SlackUrlUtils.getUriVars(tokenCorrect, "/keeper-add", KEEPER_ADD_COMMAND_TEXT))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isOk())
+                .andExpect(content().string(IN_PROGRESS));
+
+        verify(keeperService).sendKeeperAddRequest("@from-user", KEEPER_ADD_COMMAND_TEXT);
+        verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
+        verifyNoMoreInteractions(keeperService, restTemplate);
+
+        assertTrue(richMessageCaptor.getValue().getText().contains("Some service unavailable"));
     }
 
     @Test
