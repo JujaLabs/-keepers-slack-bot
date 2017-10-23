@@ -61,7 +61,7 @@ public class RestUserRepositoryTest {
         //given
         List<String> slackNames = new ArrayList<>();
         slackNames.add("@bob.slack");
-        slackNames.add("@john.slack");
+        slackNames.add("john.slack");
         mockServer.expect(requestTo(urlBaseUsers + version + urlGetUsers))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().contentType(APPLICATION_JSON_UTF8))

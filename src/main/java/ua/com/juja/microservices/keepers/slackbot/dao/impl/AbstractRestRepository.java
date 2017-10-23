@@ -8,6 +8,7 @@ import ua.com.juja.microservices.keepers.slackbot.exception.ApiError;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 
 /**
  * @author Nikolay Horushko
@@ -29,7 +30,7 @@ public class AbstractRestRepository {
                     "I'm, sorry. I cannot parse api error message from remote service :(",
                     "Cannot parse api error message from remote service",
                     e.getMessage(),
-                    Arrays.asList(httpClientErrorException.getMessage())
+                    Collections.singletonList(httpClientErrorException.getMessage())
             );
         }
     }
