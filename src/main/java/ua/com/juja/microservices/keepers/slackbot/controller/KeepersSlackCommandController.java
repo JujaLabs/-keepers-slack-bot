@@ -24,6 +24,7 @@ import java.io.PrintWriter;
  * @author Nikolay Horushko
  * @author Dmitriy Lyashenko
  * @author Konstantin Sergey
+ * @author Ivan Shapovalov
  */
 @RestController
 @RequestMapping(value = "${keepers.slackBot.rest.api.version}" + "${keepers.slackBot.baseCommandsUrl}")
@@ -109,13 +110,39 @@ public class KeepersSlackCommandController {
                     fromUser, text, token);
 
             if (!token.equals(slackToken)) {
-                logger.warn("Received invalid slack token: [{}] in command Keeper for user: [{}]", token, fromUser);
+                logger.warn("Received invalid slack token: [{}] in command getKeeperDirections for user: [{}]", token,
+                        fromUser);
                 sendQuickResponse(httpServletResponse, SORRY_MESSAGE);
             } else {
                 sendQuickResponse(httpServletResponse, IN_PROGRESS);
                 String response = keeperService.getKeeperDirections(fromUser, text);
                 logger.info("GetKeeperDirections command processed : user: [{}] text: [{}] and sent response to slack: [{}]",
                         fromUser, text, response);
+                sendDelayedResponse(responseUrl, response);
+            }
+        } catch (BaseBotException bex) {
+            sendBaseBotExceptionMessage(responseUrl, bex);
+        } catch (Exception ex) {
+            sendExceptionMessage(responseUrl, ex);
+        }
+    }
+
+    @PostMapping(value = "${keepers.slackBot.endpoint.getMyDirections}", consumes = MediaType
+            .APPLICATION_FORM_URLENCODED_VALUE)
+    public void getMyDirections(@RequestParam("token") String token,
+                                @RequestParam("user_name") String fromUser,
+                                @RequestParam("response_url") String responseUrl,
+                                HttpServletResponse httpServletResponse) {
+        try {
+            logger.debug("Received slash command GetMyDirections: from user: [{}] token: [{}]", fromUser, token);
+            if (!token.equals(slackToken)) {
+                logger.warn("Received invalid slack token: [{}] in command getMyDirections for user: [{}]", token, fromUser);
+                sendQuickResponse(httpServletResponse, SORRY_MESSAGE);
+            } else {
+                sendQuickResponse(httpServletResponse, IN_PROGRESS);
+                String response = keeperService.getMyDirections(fromUser);
+                logger.info("GetMyDirections command processed : user: [{}] and sent response to slack: [{}]",
+                        fromUser, response);
                 sendDelayedResponse(responseUrl, response);
             }
         } catch (BaseBotException bex) {

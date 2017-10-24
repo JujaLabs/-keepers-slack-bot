@@ -23,6 +23,7 @@ import ua.com.juja.microservices.utils.SlackUrlUtils;
 import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.hamcrest.CoreMatchers.containsString;
@@ -39,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * @author Nikolay Horushko
  * @author Dmitriy Lyashenko
+ * @author Ivan Shapovalov
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = {KeeperSlackBotApplication.class})
@@ -545,7 +547,7 @@ public class KeeperSlackBotIntegrationTest {
     }
 
     @Test
-    public void onReceiveSlashCommandKeeperGetDirectionsReturnOkRichMessage() throws Exception {
+    public void onReceiveSlashCommandKeeperGetDirectionsWhenFromUserNotInTextReturnOkRichMessage() throws Exception {
         //Given
         final String GET_DIRECTIONS_COMMAND = "@slack1";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
@@ -579,7 +581,33 @@ public class KeeperSlackBotIntegrationTest {
     }
 
     @Test
-    public void onReceiveSlashCommandKeeperGetDirectionsReturnEmptyRichMessage() throws Exception {
+    public void onReceiveSlashCommandKeeperGetDirectionsWhenFromUserInTextReturnErrorRichMessage() throws Exception {
+        //Given
+        final String GET_DIRECTIONS_COMMAND = "@from-user";
+        final List<UserDTO> usersInCommand = Arrays.asList(userFrom, userFrom);
+        final String EXPECTED_REQUEST_TO_SLACK = "{" +
+                "\"username\":null," +
+                "\"channel\":null," +
+                "\"text\":\"Your own slackname in command. To get your own directions use another command\"," +
+                "\"attachments\":null," +
+                "\"icon_emoji\":null," +
+                "\"response_type\":null" +
+                "}";
+
+        //When
+        mockSuccessUsersService(usersInCommand);
+        mockSuccessSlack(EXAMPLE_URL, HttpMethod.POST, EXPECTED_REQUEST_TO_SLACK);
+
+        //Then
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(slackBotVersion + "/commands/keeper"),
+                SlackUrlUtils.getUriVars(tokenCorrect, "/keeper", GET_DIRECTIONS_COMMAND))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.content().string(IN_PROGRESS));
+    }
+
+    @Test
+    public void onReceiveSlashCommandKeeperGetDirectionsWhenFromUserNotInTextReturnEmptyRichMessage() throws Exception {
         //Given
         final String GET_DIRECTIONS_COMMAND = "@slack1";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
@@ -676,6 +704,146 @@ public class KeeperSlackBotIntegrationTest {
         //Then
         mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(slackBotVersion + "/commands/keeper"),
                 SlackUrlUtils.getUriVars(tokenCorrect, "/keeper", GET_DIRECTIONS_COMMAND))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.content().string(IN_PROGRESS));
+    }
+
+
+    @Test
+    public void onReceiveSlashCommandKeeperGetMyDirectionsReturnOkRichMessage() throws Exception {
+        //Given
+        final List<UserDTO> usersInCommand = Collections.singletonList(userFrom);
+        final String EXPECTED_REQUEST_TO_KEEPERS = "{" +
+                "\"from\":\"f2034f11-561a-4e01-bfcf-ec615c1ba61a\"," +
+                "\"uuid\":\"f2034f11-561a-4e01-bfcf-ec615c1ba61a\"," +
+                "\"direction\":\"\"" +
+                "}";
+        final String EXPECTED_RESPONSE_FROM_KEEPERS = "[\"direction1, direction2\"]";
+        final String EXPECTED_REQUEST_TO_SLACK = "{" +
+                "\"username\":null," +
+                "\"channel\":null," +
+                "\"text\":\"The keeper @from-user has active directions: [direction1, direction2]\"," +
+                "\"attachments\":null," +
+                "\"icon_emoji\":null," +
+                "\"response_type\":null" +
+                "}";
+
+        //When
+        mockSuccessUsersService(usersInCommand);
+        mockSuccessKeepersService(urlBaseKeepers + keepersVersion + urlKeepers + "/" + userFrom.getUuid(),
+                HttpMethod.GET, EXPECTED_REQUEST_TO_KEEPERS, EXPECTED_RESPONSE_FROM_KEEPERS);
+        mockSuccessSlack(EXAMPLE_URL, HttpMethod.POST, EXPECTED_REQUEST_TO_SLACK);
+
+        //Then
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils
+                        .getUrlTemplate(slackBotVersion + "/commands/keeper/myDirections"),
+                SlackUrlUtils.getUriVars(tokenCorrect, "/my-directions", ""))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.content().string(IN_PROGRESS));
+    }
+
+    @Test
+    public void onReceiveSlashCommandKeeperGetMyDirectionsWhenFromUserNotAKeeperReturnEmptyRichMessage() throws
+            Exception {
+        //Given
+        final List<UserDTO> usersInCommand = Collections.singletonList(userFrom);
+        final String EXPECTED_REQUEST_TO_KEEPERS = "{" +
+                "\"from\":\"f2034f11-561a-4e01-bfcf-ec615c1ba61a\"," +
+                "\"uuid\":\"f2034f11-561a-4e01-bfcf-ec615c1ba61a\"," +
+                "\"direction\":\"\"" +
+                "}";
+        final String EXPECTED_RESPONSE_FROM_KEEPERS = "[]";
+        final String EXPECTED_REQUEST_TO_SLACK = "{" +
+                "\"username\":null," +
+                "\"channel\":null," +
+                "\"text\":\"The keeper @from-user has no active directions.\"," +
+                "\"attachments\":null," +
+                "\"icon_emoji\":null," +
+                "\"response_type\":null" +
+                "}";
+
+        //When
+        mockSuccessUsersService(usersInCommand);
+        mockSuccessKeepersService(urlBaseKeepers + keepersVersion + urlKeepers + "/" + userFrom.getUuid(),
+                HttpMethod.GET, EXPECTED_REQUEST_TO_KEEPERS, EXPECTED_RESPONSE_FROM_KEEPERS);
+        mockSuccessSlack(EXAMPLE_URL, HttpMethod.POST, EXPECTED_REQUEST_TO_SLACK);
+
+        //Then
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils
+                        .getUrlTemplate(slackBotVersion + "/commands/keeper/myDirections"),
+                SlackUrlUtils.getUriVars(tokenCorrect, "/my-directions", ""))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.content().string(IN_PROGRESS));
+    }
+
+    @Test
+    public void onReceiveSlashCommandKeeperGetMyDirectionsIncorrectTokenShouldSendSorryRichMessage() throws Exception {
+        //Then
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(slackBotVersion
+                        + "/commands/keeper/myDirections"),
+                SlackUrlUtils.getUriVars(TOKEN_WRONG, "/my-directions", ""))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.content().string(SORRY_MESSAGE));
+    }
+
+    @Test
+    public void returnClientErrorMessageForKeeperGetMyDirectionsWhenUserServiceIsFail() throws Exception {
+        //Given
+        final List<UserDTO> usersInCommand = Collections.singletonList(userFrom);
+        final String EXPECTED_REQUEST_TO_SLACK = "{" +
+                "\"username\":null," +
+                "\"channel\":null," +
+                "\"text\":\"very big and scare error\"," +
+                "\"attachments\":null," +
+                "\"icon_emoji\":null," +
+                "\"response_type\":null" +
+                "}";
+
+        //When
+        mockFailUsersService(usersInCommand);
+        mockSuccessSlack(EXAMPLE_URL, HttpMethod.POST, EXPECTED_REQUEST_TO_SLACK);
+
+        //Then
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils
+                        .getUrlTemplate(slackBotVersion + "/commands/keeper/myDirections"),
+                SlackUrlUtils.getUriVars(tokenCorrect, "/my-directions", ""))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.content().string(IN_PROGRESS));
+    }
+
+    @Test
+    public void returnClientErrorMessageForKeeperGetMyDirectionsWhenKeepersServiceIsFail() throws Exception {
+        //Given
+        final List<UserDTO> usersInCommand = Collections.singletonList(userFrom);
+        final String EXPECTED_REQUEST_TO_KEEPERS = "{" +
+                "\"from\":\"f2034f11-561a-4e01-bfcf-ec615c1ba61a\"," +
+                "\"uuid\":\"f2034f11-561a-4e01-bfcf-ec615c1ba61a\"," +
+                "\"direction\":\"\"" +
+                "}";
+        final String EXPECTED_REQUEST_TO_SLACK = "{" +
+                "\"username\":null," +
+                "\"channel\":null," +
+                "\"text\":\"Oops something went wrong :(\"," +
+                "\"attachments\":null," +
+                "\"icon_emoji\":null," +
+                "\"response_type\":null" +
+                "}";
+
+        //When
+        mockSuccessUsersService(usersInCommand);
+        mockFailKeepersService(urlBaseKeepers + keepersVersion + urlKeepers + "/" + userFrom.getUuid(),
+                HttpMethod.GET, EXPECTED_REQUEST_TO_KEEPERS);
+        mockSuccessSlack(EXAMPLE_URL, HttpMethod.POST, EXPECTED_REQUEST_TO_SLACK);
+
+        //Then
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils
+                        .getUrlTemplate(slackBotVersion + "/commands/keeper/myDirections"),
+                SlackUrlUtils.getUriVars(tokenCorrect, "/my-directions", ""))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isOk())
                 .andExpect(MockMvcResultMatchers.content().string(IN_PROGRESS));

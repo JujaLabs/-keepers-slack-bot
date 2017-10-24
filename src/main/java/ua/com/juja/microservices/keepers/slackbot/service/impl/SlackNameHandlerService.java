@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 /**
  * @author Nikolay Horushko
  * @author Konstantin Sergey
+ * @author Ivan Shapovalov
  */
 @Service
 public class SlackNameHandlerService {
@@ -49,7 +50,9 @@ public class SlackNameHandlerService {
         }
         Map<String, UserDTO> usersMap = receiveUsersMap(fromUser, text);
         UserDTO fromUserDTO = usersMap.get(fromUser);
-        usersMap.remove(fromUser);
+        if (usersMap.size() > 1) {
+            usersMap.remove(fromUser);
+        }
 
         return new SlackParsedCommand(fromUserDTO, text, new ArrayList<>(usersMap.values()));
     }
@@ -61,7 +64,7 @@ public class SlackNameHandlerService {
         logger.debug("send slack names: {} to user service", slackNames);
         List<UserDTO> users = userService.findUsersBySlackNames(slackNames);
         return users.stream()
-                .collect(Collectors.toMap(user -> user.getSlack(), user -> user, (e1, e2) -> e1, LinkedHashMap::new));
+                .collect(Collectors.toMap(UserDTO::getSlack, user -> user, (e1, e2) -> e1, LinkedHashMap::new));
     }
 
     private List<String> receiveAllSlackNames(String text) {

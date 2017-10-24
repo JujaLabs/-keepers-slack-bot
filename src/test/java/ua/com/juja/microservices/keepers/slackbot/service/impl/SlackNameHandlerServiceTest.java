@@ -11,15 +11,14 @@ import ua.com.juja.microservices.keepers.slackbot.model.dto.UserDTO;
 import ua.com.juja.microservices.keepers.slackbot.service.UserService;
 
 import javax.inject.Inject;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.when;
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * @author Nikolay Horushko
@@ -78,10 +77,10 @@ public class SlackNameHandlerServiceTest {
     public void getSlackParsedCommandWithoutSlackInText() throws Exception {
         //given
         String text = "text without slack name TexT text.";
-        List<String> requestToUserService = Arrays.asList(userFrom.getSlack());
-        List<UserDTO> responseFromUserService = Arrays.asList(userFrom);
+        List<String> requestToUserService = Collections.singletonList(userFrom.getSlack());
+        List<UserDTO> responseFromUserService = Collections.singletonList(userFrom);
         when(userService.findUsersBySlackNames(requestToUserService)).thenReturn(responseFromUserService);
-        SlackParsedCommand expected = new SlackParsedCommand(userFrom, text, new ArrayList<>());
+        SlackParsedCommand expected = new SlackParsedCommand(userFrom, text, Collections.singletonList(userFrom));
         //when
         SlackParsedCommand actual = slackNameHandlerService.createSlackParsedCommand(userFrom.getSlack(), text);
         //then
@@ -89,7 +88,7 @@ public class SlackNameHandlerServiceTest {
     }
 
     @Test
-    public void shouldAddATToFromUserIfFromUserWithoutAT(){
+    public void shouldAddATToFromUserIfFromUserWithoutAT() {
         //given
         String text = "SomeText " + user1.getSlack();
         List<String> requestToUserService = Arrays.asList(user1.getSlack(), userFrom.getSlack());

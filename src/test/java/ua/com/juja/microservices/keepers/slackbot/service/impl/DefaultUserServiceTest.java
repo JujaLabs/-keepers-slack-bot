@@ -13,7 +13,7 @@ import javax.inject.Inject;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 import static org.mockito.BDDMockito.given;
 
 /**
@@ -32,9 +32,9 @@ public class DefaultUserServiceTest {
     @Test
     public void returnUsersListBySlacks() throws Exception {
         //given
-        List<String> slackNamesRequest = Arrays.asList(new String[]{"@slack1", "@slack2"});
-        List<UserDTO> usersResponse = Arrays.asList(new UserDTO[]{new UserDTO("uuid1", "@slack1"),
-                new UserDTO("uuid2", "slack2")});
+        List<String> slackNamesRequest = Arrays.asList("@slack1", "@slack2");
+        List<UserDTO> usersResponse = Arrays.asList(new UserDTO("uuid1", "@slack1"),
+                new UserDTO("uuid2", "slack2"));
         given(userRepository.findUsersBySlackNames(slackNamesRequest)).willReturn(usersResponse);
         //when
         List<UserDTO> result = userService.findUsersBySlackNames(slackNamesRequest);

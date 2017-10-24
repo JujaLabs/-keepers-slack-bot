@@ -22,7 +22,10 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -30,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Nikolay Horushko
  * @author Dmitriy Lyashenko
  * @author Konstantin Sergey
+ * @author Ivan Shapovalov
  */
 @RunWith(SpringRunner.class)
 @WebMvcTest(KeepersSlackCommandController.class)
@@ -271,6 +275,55 @@ public class KeepersSlackCommandControllerTest {
                 .andExpect(content().string(IN_PROGRESS));
 
         verify(keeperService).getKeeperDirections("@from-user", GET_DIRECTIONS_COMMAND_TEXT);
+        verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
+        verifyNoMoreInteractions(keeperService, restTemplate);
+
+        assertTrue(richMessageCaptor.getValue().getText().contains(ERROR_MESSAGE));
+    }
+
+    @Test
+    public void onReceiveSlashGetMyDirectionsSendOkRichMessage() throws Exception {
+        // given
+        final String KEEPER_RESPONSE = "The keeper @from-user has active directions: [direction1, direction2]";
+        ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
+
+        // when
+        when(keeperService.getMyDirections("@from-user")).thenReturn(KEEPER_RESPONSE);
+        when(restTemplate.postForObject(anyString(), any(RichMessage.class), anyObject())).thenReturn("[OK]");
+
+        // then
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils
+                        .getUrlTemplate(version + "/commands/keeper/myDirections"),
+                SlackUrlUtils.getUriVars(tokenCorrect, "/keeper/AAA111", ""))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isOk())
+                .andExpect(content().string(IN_PROGRESS));
+
+        verify(keeperService).getMyDirections("@from-user");
+        verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
+        verifyNoMoreInteractions(keeperService, restTemplate);
+
+        assertTrue(richMessageCaptor.getValue().getText().contains(KEEPER_RESPONSE));
+    }
+
+    @Test
+    public void onReceiveSlashGetMyDirectionsShouldSendExceptionMessage() throws Exception {
+        // given
+        ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
+
+        // when
+        when(keeperService.getMyDirections("@from-user")).thenThrow(new RuntimeException(ERROR_MESSAGE));
+        when(restTemplate.postForObject(anyString(), any(RichMessage.class), anyObject())).thenReturn("[OK]");
+
+        // then
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils
+                        .getUrlTemplate(version + "/commands/keeper/myDirections"),
+                SlackUrlUtils.getUriVars(tokenCorrect, "/keeper/AAA111", ""))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isOk())
+                .andExpect(content().string(IN_PROGRESS));
+
+        verify(keeperService).getMyDirections("@from-user");
         verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
         verifyNoMoreInteractions(keeperService, restTemplate);
 
