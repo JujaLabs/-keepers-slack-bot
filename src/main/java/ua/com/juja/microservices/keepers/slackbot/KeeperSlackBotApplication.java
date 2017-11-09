@@ -3,6 +3,8 @@ package ua.com.juja.microservices.keepers.slackbot;
 import org.apache.http.impl.client.HttpClients;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.netflix.eureka.EnableEurekaClient;
+import org.springframework.cloud.netflix.feign.EnableFeignClients;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
@@ -16,9 +18,16 @@ import java.util.List;
 
 /**
  * @author Nikolay Horushko
+ * @author Ivan Shapovalov
  */
 @SpringBootApplication
+@EnableEurekaClient
+@EnableFeignClients
 public class KeeperSlackBotApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(KeeperSlackBotApplication.class);
+    }
+
     @Bean
     public RestTemplate restTemplate() {
         RestTemplate restTemplate = new RestTemplate(httpRequestFactory());
@@ -35,9 +44,5 @@ public class KeeperSlackBotApplication {
         converters.add(new MappingJackson2HttpMessageConverter());
         converters.add(new StringHttpMessageConverter());
         return converters;
-    }
-
-    public static void main(String[] args) {
-        SpringApplication.run(KeeperSlackBotApplication.class);
     }
 }
