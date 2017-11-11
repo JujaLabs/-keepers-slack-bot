@@ -11,17 +11,19 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
+import ua.com.juja.microservices.keepers.slackbot.exception.ApiError;
+import ua.com.juja.microservices.keepers.slackbot.exception.UserExchangeException;
 import ua.com.juja.microservices.keepers.slackbot.service.KeeperService;
 import ua.com.juja.microservices.utils.SlackUrlUtils;
 
 import javax.inject.Inject;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -44,10 +46,8 @@ public class KeepersSlackCommandControllerTest {
     private static final String EXAMPLE_URL = "http://example.com";
     private static final String ERROR_MESSAGE = "Something went wrong!";
     private static final String TOKEN_WRONG = "wrongSlackToken";
-    @Value("${keepers.slackBot.slack.slashCommandToken}")
+    @Value("${slack.slashCommandToken}")
     private String tokenCorrect;
-    @Value("${keepers.slackBot.rest.api.version}")
-    private String version;
 
     @Inject
     private MockMvc mvc;
@@ -58,18 +58,29 @@ public class KeepersSlackCommandControllerTest {
     @MockBean
     private RestTemplate restTemplate;
 
+    private String keepersSlackbotAddKeeperUrl = "/v1/commands/keeper/add";
+    private String keepersSlackbotDeactivateKeeperUrl = "/v1/commands/keeper/deactivate";
+    private String keepersSlackbotGetKeeperDirectionsUrl = "/v1/commands/keeper";
+    private String keepersSlackbotGetMyDirectionsUrl = "/v1/commands/keeper/myDirections";
+
     @Test
-    public void onReceiveSlashCommandKeeperAddIncorrectTokenShouldSendSorryRichMessage() throws Exception {
-        // given
-        final String KEEPER_ADD_COMMAND_TEXT = "@slack_name teams";
-
-        // then
-        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(version + "/commands/keeper/add"),
-                SlackUrlUtils.getUriVars(TOKEN_WRONG, "/command", KEEPER_ADD_COMMAND_TEXT))
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
-                .andExpect(status().isOk())
-                .andExpect(content().string(SORRY_MESSAGE));
-
+    public void onReceiveAllSlashCommandsWhenIncorrectTokenShouldReturnSorryMessage() throws Exception {
+        List<String> urls = Arrays.asList(
+                keepersSlackbotAddKeeperUrl,
+                keepersSlackbotDeactivateKeeperUrl,
+                keepersSlackbotGetKeeperDirectionsUrl,
+                keepersSlackbotGetMyDirectionsUrl);
+        urls.forEach(url -> {
+            try {
+                mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(url),
+                        SlackUrlUtils.getUriVars(TOKEN_WRONG, "/command", ""))
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                        .andExpect(status().isOk())
+                        .andExpect(content().string(SORRY_MESSAGE));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
         verifyNoMoreInteractions(keeperService, restTemplate);
     }
 
@@ -80,88 +91,139 @@ public class KeepersSlackCommandControllerTest {
         final String KEEPER_RESPONSE = "Thanks, we added a new Keeper: @slack1 in direction: teams";
         ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
 
-        // when
         when(keeperService.sendKeeperAddRequest("@from-user", KEEPER_ADD_COMMAND_TEXT))
                 .thenReturn(KEEPER_RESPONSE);
-        when(restTemplate.postForObject(anyString(), any(RichMessage.class), anyObject())).thenReturn("[OK]");
+        when(restTemplate.postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class))).thenReturn("[OK]");
 
-        // then
-        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(version + "/commands/keeper/add"),
+        // when
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(keepersSlackbotAddKeeperUrl),
                 SlackUrlUtils.getUriVars(tokenCorrect, "/keeper-add", KEEPER_ADD_COMMAND_TEXT))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isOk())
                 .andExpect(content().string(IN_PROGRESS));
 
+        // then
+        assertTrue(richMessageCaptor.getValue().getText().contains(KEEPER_RESPONSE));
         verify(keeperService).sendKeeperAddRequest("@from-user", KEEPER_ADD_COMMAND_TEXT);
         verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
         verifyNoMoreInteractions(keeperService, restTemplate);
-
-        assertTrue(richMessageCaptor.getValue().getText().contains(KEEPER_RESPONSE));
     }
 
     @Test
-    public void onReceiveSlashKeeperAddShouldSendExceptionMessage() throws Exception {
+    public void onReceiveSlashKeeperAddWhenRuntimeExceptionThrownShouldSendExceptionMessage() throws Exception {
         // given
         final String KEEPER_ADD_COMMAND_TEXT = "@slack1 teams";
         ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
 
-        // when
         when(keeperService.sendKeeperAddRequest(any(String.class), any(String.class)))
                 .thenThrow(new RuntimeException(ERROR_MESSAGE));
-        when(restTemplate.postForObject(anyString(), any(RichMessage.class), anyObject())).thenReturn("[OK]");
-
-        // then
-        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(version + "/commands/keeper/add"),
-                SlackUrlUtils.getUriVars(tokenCorrect, "/keeper-add", KEEPER_ADD_COMMAND_TEXT))
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
-                .andExpect(status().isOk())
-                .andExpect(content().string(IN_PROGRESS));
-
-        verify(keeperService).sendKeeperAddRequest("@from-user", KEEPER_ADD_COMMAND_TEXT);
-        verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
-        verifyNoMoreInteractions(keeperService, restTemplate);
-
-        assertTrue(richMessageCaptor.getValue().getText().contains(ERROR_MESSAGE));
-    }
-
-    @Test
-    public void onReceiveSlashKeeperAddWhenUsersServiceUnavailableShouldSendExceptionMessage() throws Exception {
-        // given
-        final String KEEPER_ADD_COMMAND_TEXT = "@slack1 teams";
-        ResourceAccessException exception = new ResourceAccessException("Some service unavailable");
-        ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
+        when(restTemplate.postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class))).thenReturn("[OK]");
 
         // when
-        when(keeperService.sendKeeperAddRequest(any(String.class), any(String.class)))
-                .thenThrow(exception);
-        when(restTemplate.postForObject(anyString(), any(RichMessage.class), anyObject())).thenReturn("[OK]");
-
-        // then
-        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(version + "/commands/keeper/add"),
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(keepersSlackbotAddKeeperUrl),
                 SlackUrlUtils.getUriVars(tokenCorrect, "/keeper-add", KEEPER_ADD_COMMAND_TEXT))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isOk())
                 .andExpect(content().string(IN_PROGRESS));
 
+        // then
+        assertTrue(richMessageCaptor.getValue().getText().contains(ERROR_MESSAGE));
         verify(keeperService).sendKeeperAddRequest("@from-user", KEEPER_ADD_COMMAND_TEXT);
         verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
         verifyNoMoreInteractions(keeperService, restTemplate);
-
-        assertTrue(richMessageCaptor.getValue().getText().contains("Some service unavailable"));
     }
 
     @Test
-    public void onReceiveSlashCommandKeeperDeactivateIncorrectTokenShouldSendSorryRichMessage() throws Exception {
+    public void onReceiveSlashKeeperAddWhenNestedExceptionAfterRuntimeExceptionThrownDoNothing()
+            throws Exception {
         // given
-        final String KEEPER_DEACTIVATE_COMMAND_TEXT = "@slack_name teams";
+        final String KEEPER_ADD_COMMAND_TEXT = "@slack1 teams";
+        ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
 
-        // then
-        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(version + "/commands/keeper/deactivate"),
-                SlackUrlUtils.getUriVars(TOKEN_WRONG, "/command", KEEPER_DEACTIVATE_COMMAND_TEXT))
+        when(keeperService.sendKeeperAddRequest(any(String.class), any(String.class)))
+                .thenThrow(new RuntimeException(ERROR_MESSAGE));
+        RuntimeException runtimeException = new RuntimeException();
+        when(restTemplate.postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class)))
+                .thenThrow(runtimeException);
+
+        // when
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(keepersSlackbotAddKeeperUrl),
+                SlackUrlUtils.getUriVars(tokenCorrect, "/keeper-add", KEEPER_ADD_COMMAND_TEXT))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isOk())
-                .andExpect(content().string(SORRY_MESSAGE));
+                .andExpect(content().string(IN_PROGRESS));
 
+        // then
+        assertTrue(richMessageCaptor.getValue().getText().contains(ERROR_MESSAGE));
+        verify(keeperService).sendKeeperAddRequest("@from-user", KEEPER_ADD_COMMAND_TEXT);
+        verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
+        verifyNoMoreInteractions(keeperService, restTemplate);
+    }
+
+    @Test
+    public void onReceiveSlashKeeperAddWhenSomeServiceUnavailableShouldSendExceptionMessage() throws Exception {
+        // given
+        final String KEEPER_ADD_COMMAND_TEXT = "@slack1 teams";
+        ApiError apiError = new ApiError(
+                400, "KMF-F5-D2",
+                "Sorry, User server return an error",
+                "Exception - UserExchangeException",
+                "Something went wrong",
+                Collections.emptyList()
+        );
+        UserExchangeException userExchangeException = new UserExchangeException(apiError, new RuntimeException());
+        ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
+
+        when(keeperService.sendKeeperAddRequest(any(String.class), any(String.class)))
+                .thenThrow(userExchangeException);
+        when(restTemplate.postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class))).thenReturn("[OK]");
+
+        // when
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(keepersSlackbotAddKeeperUrl),
+                SlackUrlUtils.getUriVars(tokenCorrect, "/keeper-add", KEEPER_ADD_COMMAND_TEXT))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isOk())
+                .andExpect(content().string(IN_PROGRESS));
+
+        // then
+        assertTrue(richMessageCaptor.getValue().getText().contains("Something went wrong"));
+        verify(keeperService).sendKeeperAddRequest("@from-user", KEEPER_ADD_COMMAND_TEXT);
+        verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
+        verifyNoMoreInteractions(keeperService, restTemplate);
+    }
+
+    @Test
+    public void onReceiveSlashKeeperAddWhenNestedExceptionWhenSomeServiceUnavailableShouldDoNothing()
+            throws Exception {
+        // given
+        final String KEEPER_ADD_COMMAND_TEXT = "@slack1 teams";
+        ApiError apiError = new ApiError(
+                400, "KMF-F5-D2",
+                "Sorry, User server return an error",
+                "Exception - UserExchangeException",
+                "Something went wrong",
+                Collections.emptyList()
+        );
+        UserExchangeException userExchangeException = new UserExchangeException(apiError, new RuntimeException());
+        ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
+
+        when(keeperService.sendKeeperAddRequest(any(String.class), any(String.class)))
+                .thenThrow(userExchangeException);
+        RuntimeException runtimeException = new RuntimeException();
+        when(restTemplate.postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class)))
+                .thenThrow(runtimeException);
+
+        // when
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(keepersSlackbotAddKeeperUrl),
+                SlackUrlUtils.getUriVars(tokenCorrect, "/keeper-add", KEEPER_ADD_COMMAND_TEXT))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isOk())
+                .andExpect(content().string(IN_PROGRESS));
+
+        // then
+        assertTrue(richMessageCaptor.getValue().getText().contains("Something went wrong"));
+        verify(keeperService).sendKeeperAddRequest("@from-user", KEEPER_ADD_COMMAND_TEXT);
+        verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
         verifyNoMoreInteractions(keeperService, restTemplate);
     }
 
@@ -172,61 +234,77 @@ public class KeepersSlackCommandControllerTest {
         final String KEEPER_RESPONSE = "Keeper: @slack1 in direction: teams dismissed";
         ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
 
-        // when
         when(keeperService.sendKeeperDeactivateRequest("@from-user", KEEPER_DEACTIVATE_COMMAND_TEXT))
                 .thenReturn(KEEPER_RESPONSE);
-        when(restTemplate.postForObject(anyString(), any(RichMessage.class), anyObject())).thenReturn("[OK]");
+        when(restTemplate.postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class))).thenReturn("[OK]");
 
-        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(version + "/commands/keeper/deactivate"),
+        // when
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(keepersSlackbotDeactivateKeeperUrl),
                 SlackUrlUtils.getUriVars(tokenCorrect, "/keeper-deactivate", KEEPER_DEACTIVATE_COMMAND_TEXT))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isOk())
                 .andExpect(content().string(IN_PROGRESS));
 
+        //than
+        assertTrue(richMessageCaptor.getValue().getText().contains(KEEPER_RESPONSE));
         verify(keeperService).sendKeeperDeactivateRequest("@from-user", KEEPER_DEACTIVATE_COMMAND_TEXT);
         verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
         verifyNoMoreInteractions(keeperService, restTemplate);
-
-        assertTrue(richMessageCaptor.getValue().getText().contains(KEEPER_RESPONSE));
     }
 
     @Test
-    public void onReceiveSlashKeeperDeactivateShouldSendExceptionMessage() throws Exception {
+    public void onReceiveSlashKeeperDeactivateWhenRuntimeExceptionShouldSendExceptionMessage() throws Exception {
         // given
         final String KEEPER_DEACTIVATE_COMMAND_TEXT = "@slack1 teams";
         ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
 
-        // when
         when(keeperService.sendKeeperDeactivateRequest(any(String.class), any(String.class)))
                 .thenThrow(new RuntimeException(ERROR_MESSAGE));
-        when(restTemplate.postForObject(anyString(), any(RichMessage.class), anyObject())).thenReturn("[OK]");
+        when(restTemplate.postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class))).thenReturn("[OK]");
 
-        // then
-        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(version + "/commands/keeper/deactivate"),
+        // when
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(keepersSlackbotDeactivateKeeperUrl),
                 SlackUrlUtils.getUriVars(tokenCorrect, "/keeper-deactivate", KEEPER_DEACTIVATE_COMMAND_TEXT))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isOk())
                 .andExpect(content().string(IN_PROGRESS));
 
+        // then
+        assertTrue(richMessageCaptor.getValue().getText().contains(ERROR_MESSAGE));
         verify(keeperService).sendKeeperDeactivateRequest("@from-user", KEEPER_DEACTIVATE_COMMAND_TEXT);
         verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
         verifyNoMoreInteractions(keeperService, restTemplate);
-
-        assertTrue(richMessageCaptor.getValue().getText().contains(ERROR_MESSAGE));
     }
 
     @Test
-    public void onReceiveSlashCommandGetKeeperDirectionsIncorrectTokenShouldSendSorryRichMessage() throws Exception {
+    public void onReceiveSlashKeeperDeactivateWhenSomeServiceUnavailableShouldSendExceptionMessage() throws Exception {
         // given
-        final String GET_DIRECTIONS_COMMAND_TEXT = "@slack_name";
+        final String commandText = "@slack1 teams";
+        ApiError apiError = new ApiError(
+                400, "KMF-F5-D2",
+                "Sorry, User server return an error",
+                "Exception - UserExchangeException",
+                "Something went wrong",
+                Collections.emptyList()
+        );
+        UserExchangeException userExchangeException = new UserExchangeException(apiError, new RuntimeException());
+        ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
 
-        // then
-        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(version + "/commands/keeper"),
-                SlackUrlUtils.getUriVars(TOKEN_WRONG, "/command", GET_DIRECTIONS_COMMAND_TEXT))
+        when(keeperService.sendKeeperDeactivateRequest(any(String.class), any(String.class)))
+                .thenThrow(userExchangeException);
+        when(restTemplate.postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class))).thenReturn("[OK]");
+
+        // when
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(keepersSlackbotDeactivateKeeperUrl),
+                SlackUrlUtils.getUriVars(tokenCorrect, "/keeper-deactivate", commandText))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isOk())
-                .andExpect(content().string(SORRY_MESSAGE));
+                .andExpect(content().string(IN_PROGRESS));
 
+        // then
+        assertTrue(richMessageCaptor.getValue().getText().contains("Something went wrong"));
+        verify(keeperService).sendKeeperDeactivateRequest("@from-user", commandText);
+        verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
         verifyNoMoreInteractions(keeperService, restTemplate);
     }
 
@@ -237,48 +315,80 @@ public class KeepersSlackCommandControllerTest {
         final String KEEPER_RESPONSE = "The keeper @slack1 has active directions: [direction1, direction2]";
         ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
 
-        // when
         when(keeperService.getKeeperDirections("@from-user", GET_DIRECTIONS_COMMAND_TEXT))
                 .thenReturn(KEEPER_RESPONSE);
-        when(restTemplate.postForObject(anyString(), any(RichMessage.class), anyObject())).thenReturn("[OK]");
+        when(restTemplate.postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class))).thenReturn("[OK]");
 
-        // then
-        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(version + "/commands/keeper"),
+        // when
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(keepersSlackbotGetKeeperDirectionsUrl),
                 SlackUrlUtils.getUriVars(tokenCorrect, "/keeper/AAA111", GET_DIRECTIONS_COMMAND_TEXT))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isOk())
                 .andExpect(content().string(IN_PROGRESS));
 
+        // then
+        assertTrue(richMessageCaptor.getValue().getText().contains(KEEPER_RESPONSE));
         verify(keeperService).getKeeperDirections("@from-user", GET_DIRECTIONS_COMMAND_TEXT);
         verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
         verifyNoMoreInteractions(keeperService, restTemplate);
-
-        assertTrue(richMessageCaptor.getValue().getText().contains(KEEPER_RESPONSE));
     }
 
     @Test
-    public void onReceiveSlashGetKeeperDirectionsShouldSendExceptionMessage() throws Exception {
+    public void onReceiveSlashGetKeeperDirectionsWhenRuntimeExceptionThrownShouldSendExceptionMessage() throws
+            Exception {
         // given
         final String GET_DIRECTIONS_COMMAND_TEXT = "@slack1";
         ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
 
-        // when
         when(keeperService.getKeeperDirections(any(String.class), any(String.class)))
                 .thenThrow(new RuntimeException(ERROR_MESSAGE));
-        when(restTemplate.postForObject(anyString(), any(RichMessage.class), anyObject())).thenReturn("[OK]");
+        when(restTemplate.postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class))).thenReturn("[OK]");
 
-        // then
-        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(version + "/commands/keeper"),
+        // when
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(keepersSlackbotGetKeeperDirectionsUrl),
                 SlackUrlUtils.getUriVars(tokenCorrect, "/keeper/AAA111", GET_DIRECTIONS_COMMAND_TEXT))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isOk())
                 .andExpect(content().string(IN_PROGRESS));
 
+        // then
+        assertTrue(richMessageCaptor.getValue().getText().contains(ERROR_MESSAGE));
         verify(keeperService).getKeeperDirections("@from-user", GET_DIRECTIONS_COMMAND_TEXT);
         verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
         verifyNoMoreInteractions(keeperService, restTemplate);
+    }
 
-        assertTrue(richMessageCaptor.getValue().getText().contains(ERROR_MESSAGE));
+    @Test
+    public void onReceiveSlashGetKeeperDirectionsWhenSomeServiceUnavailableShouldSendExceptionMessage() throws
+            Exception {
+        // given
+        final String commandText = "@slack1 teams";
+        ApiError apiError = new ApiError(
+                400, "KMF-F5-D2",
+                "Sorry, User server return an error",
+                "Exception - UserExchangeException",
+                "Something went wrong",
+                Collections.emptyList()
+        );
+        UserExchangeException userExchangeException = new UserExchangeException(apiError, new RuntimeException());
+        ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
+
+        when(keeperService.getKeeperDirections(any(String.class), any(String.class)))
+                .thenThrow(userExchangeException);
+        when(restTemplate.postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class))).thenReturn("[OK]");
+
+        // when
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(keepersSlackbotGetKeeperDirectionsUrl),
+                SlackUrlUtils.getUriVars(tokenCorrect, "/keeper", commandText))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isOk())
+                .andExpect(content().string(IN_PROGRESS));
+
+        // then
+        assertTrue(richMessageCaptor.getValue().getText().contains("Something went wrong"));
+        verify(keeperService).getKeeperDirections("@from-user", commandText);
+        verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
+        verifyNoMoreInteractions(keeperService, restTemplate);
     }
 
     @Test
@@ -289,44 +399,71 @@ public class KeepersSlackCommandControllerTest {
 
         // when
         when(keeperService.getMyDirections("@from-user")).thenReturn(KEEPER_RESPONSE);
-        when(restTemplate.postForObject(anyString(), any(RichMessage.class), anyObject())).thenReturn("[OK]");
+        when(restTemplate.postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class))).thenReturn("[OK]");
 
         // then
-        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils
-                        .getUrlTemplate(version + "/commands/keeper/myDirections"),
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(keepersSlackbotGetMyDirectionsUrl),
                 SlackUrlUtils.getUriVars(tokenCorrect, "/keeper/AAA111", ""))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isOk())
                 .andExpect(content().string(IN_PROGRESS));
 
+        assertTrue(richMessageCaptor.getValue().getText().contains(KEEPER_RESPONSE));
         verify(keeperService).getMyDirections("@from-user");
         verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
         verifyNoMoreInteractions(keeperService, restTemplate);
-
-        assertTrue(richMessageCaptor.getValue().getText().contains(KEEPER_RESPONSE));
     }
 
     @Test
-    public void onReceiveSlashGetMyDirectionsShouldSendExceptionMessage() throws Exception {
+    public void onReceiveSlashGetMyDirectionsWhenRuntimeExceptionThrownShouldSendExceptionMessage() throws Exception {
         // given
         ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
 
-        // when
         when(keeperService.getMyDirections("@from-user")).thenThrow(new RuntimeException(ERROR_MESSAGE));
-        when(restTemplate.postForObject(anyString(), any(RichMessage.class), anyObject())).thenReturn("[OK]");
+        when(restTemplate.postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class))).thenReturn("[OK]");
 
-        // then
-        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils
-                        .getUrlTemplate(version + "/commands/keeper/myDirections"),
+        // when
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(keepersSlackbotGetMyDirectionsUrl),
                 SlackUrlUtils.getUriVars(tokenCorrect, "/keeper/AAA111", ""))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isOk())
                 .andExpect(content().string(IN_PROGRESS));
 
+        // then
+        assertTrue(richMessageCaptor.getValue().getText().contains(ERROR_MESSAGE));
         verify(keeperService).getMyDirections("@from-user");
         verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
         verifyNoMoreInteractions(keeperService, restTemplate);
+    }
 
-        assertTrue(richMessageCaptor.getValue().getText().contains(ERROR_MESSAGE));
+    @Test
+    public void onReceiveSlashGetMyDirectionsWhenSomeServiceUnavailableShouldSendExceptionMessage() throws Exception {
+        // given
+        final String commandText = "";
+        ApiError apiError = new ApiError(
+                400, "KMF-F5-D2",
+                "Sorry, User server return an error",
+                "Exception - UserExchangeException",
+                "Something went wrong",
+                Collections.emptyList()
+        );
+        UserExchangeException userExchangeException = new UserExchangeException(apiError, new RuntimeException());
+        ArgumentCaptor<RichMessage> richMessageCaptor = ArgumentCaptor.forClass(RichMessage.class);
+
+        when(keeperService.getMyDirections("@from-user")).thenThrow(userExchangeException);
+        when(restTemplate.postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class))).thenReturn("[OK]");
+
+        // when
+        mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(keepersSlackbotGetMyDirectionsUrl),
+                SlackUrlUtils.getUriVars(tokenCorrect, "/keeper", commandText))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isOk())
+                .andExpect(content().string(IN_PROGRESS));
+
+        // then
+        assertTrue(richMessageCaptor.getValue().getText().contains("Something went wrong"));
+        verify(keeperService).getMyDirections("@from-user");
+        verify(restTemplate).postForObject(eq(EXAMPLE_URL), richMessageCaptor.capture(), eq(String.class));
+        verifyNoMoreInteractions(keeperService, restTemplate);
     }
 }
