@@ -15,6 +15,8 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 /**
  * @author Nikolay Horushko
@@ -30,15 +32,18 @@ public class DefaultUserServiceTest {
     private UserRepository userRepository;
 
     @Test
-    public void returnUsersListBySlacks() throws Exception {
+    public void findUsersBySlackNamesShouldReturnUsersCorrectly() throws Exception {
         //given
-        List<String> slackNamesRequest = Arrays.asList("@slack1", "@slack2");
+        List<String> incorrectSlackNamesRequest = Arrays.asList("slack1", "@slack2");
+        List<String> correctSlackNamesRequest = Arrays.asList("@slack1", "@slack2");
         List<UserDTO> usersResponse = Arrays.asList(new UserDTO("uuid1", "@slack1"),
                 new UserDTO("uuid2", "slack2"));
-        given(userRepository.findUsersBySlackNames(slackNamesRequest)).willReturn(usersResponse);
+        given(userRepository.findUsersBySlackNames(correctSlackNamesRequest)).willReturn(usersResponse);
         //when
-        List<UserDTO> result = userService.findUsersBySlackNames(slackNamesRequest);
+        List<UserDTO> result = userService.findUsersBySlackNames(incorrectSlackNamesRequest);
         //then
         assertEquals("[UserDTO(uuid=uuid1, slack=@slack1), UserDTO(uuid=uuid2, slack=slack2)]", result.toString());
+        verify(userRepository).findUsersBySlackNames(correctSlackNamesRequest);
+        verifyNoMoreInteractions(userRepository);
     }
 }
