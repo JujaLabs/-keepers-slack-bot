@@ -9,10 +9,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 import ua.com.juja.microservices.keepers.slackbot.exception.BaseBotException;
-import ua.com.juja.microservices.keepers.slackbot.exception.UserExchangeException;
 import ua.com.juja.microservices.keepers.slackbot.service.KeeperService;
 
 import javax.inject.Inject;
@@ -27,12 +25,12 @@ import java.io.PrintWriter;
  * @author Ivan Shapovalov
  */
 @RestController
-@RequestMapping(value = "${keepers.slackBot.rest.api.version}" + "${keepers.slackBot.baseCommandsUrl}")
+@RequestMapping(value = "/v1/commands/keeper")
 public class KeepersSlackCommandController {
     private static final String SORRY_MESSAGE = "Sorry! You're not lucky enough to use our slack command.";
     private static final String IN_PROGRESS = "In progress...";
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
-    @Value("${keepers.slackBot.slack.slashCommandToken}")
+    @Value("${slack.slashCommandToken}")
     private String slackToken;
 
     private KeeperService keeperService;
@@ -45,7 +43,7 @@ public class KeepersSlackCommandController {
         this.restTemplate = restTemplate;
     }
 
-    @PostMapping(value = "${keepers.slackBot.endpoint.keeperAdd}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    @PostMapping(value = "/add", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public void addKeeper(@RequestParam("token") String token,
                           @RequestParam("user_name") String fromUser,
                           @RequestParam("text") String text,
@@ -72,7 +70,7 @@ public class KeepersSlackCommandController {
         }
     }
 
-    @PostMapping(value = "${keepers.slackBot.endpoint.keeperDeactivate}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    @PostMapping(value = "/deactivate", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public void deactivateKeeper(@RequestParam("token") String token,
                                  @RequestParam("user_name") String fromUser,
                                  @RequestParam("text") String text,
@@ -127,8 +125,7 @@ public class KeepersSlackCommandController {
         }
     }
 
-    @PostMapping(value = "${keepers.slackBot.endpoint.getMyDirections}", consumes = MediaType
-            .APPLICATION_FORM_URLENCODED_VALUE)
+    @PostMapping(value = "/myDirections", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public void getMyDirections(@RequestParam("token") String token,
                                 @RequestParam("user_name") String fromUser,
                                 @RequestParam("response_url") String responseUrl,
@@ -169,11 +166,8 @@ public class KeepersSlackCommandController {
     private void sendBaseBotExceptionMessage(String responseUrl, BaseBotException bex) {
         logger.warn("There was an exceptional situation: [{}]", bex.detailMessage());
         try {
-            String message = bex.getMessage();
-            if (bex instanceof UserExchangeException) {
-                message = bex.getExceptionMessage();
-            }
-            String slackAnswer = restTemplate.postForObject(responseUrl, new RichMessage(message), String.class);
+            String slackAnswer = restTemplate.postForObject(responseUrl, new RichMessage(bex.getExceptionMessage()), String
+                    .class);
             logger.warn("Slack answered: [{}]", slackAnswer == null ? "null" : slackAnswer);
         } catch (Exception e) {
             logger.warn("Nested exception: [{}]", e.getMessage());
@@ -183,11 +177,7 @@ public class KeepersSlackCommandController {
     private void sendExceptionMessage(String responseUrl, Exception ex) {
         logger.warn("There was an exceptional situation: [{}]", ex.getMessage());
         try {
-            String message = ex.getMessage();
-            if (ex instanceof ResourceAccessException) {
-                message = "Some service unavailable";
-            }
-            String slackAnswer = restTemplate.postForObject(responseUrl, new RichMessage(message), String.class);
+            String slackAnswer = restTemplate.postForObject(responseUrl, new RichMessage(ex.getMessage()), String.class);
             logger.warn("Slack answered: [{}]", slackAnswer == null ? "null" : slackAnswer);
         } catch (Exception e) {
             logger.warn("Nested exception: [{}]", e.getMessage());
