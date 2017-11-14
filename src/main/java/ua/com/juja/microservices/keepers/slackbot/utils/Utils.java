@@ -1,22 +1,42 @@
 package ua.com.juja.microservices.keepers.slackbot.utils;
 
-import ua.com.juja.microservices.keepers.slackbot.model.SlackParsedCommand;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+import ua.com.juja.microservices.keepers.slackbot.exception.ApiError;
 
 import java.io.IOException;
-import java.util.Properties;
+import java.util.Collections;
 
 /**
- * @author Konstantin Sergey
+ * @author Ivan Shapovalov
  */
+@Slf4j
 public class Utils {
-    public static String getProperty(String propertyFile, String propertyName) {
-        Properties properties = new Properties();
-        ClassLoader loader = SlackParsedCommand.class.getClassLoader();
-        try {
-            properties.load(loader.getResourceAsStream(propertyFile));
-        } catch (IOException e) {
-            e.printStackTrace();
+    public static ApiError convertToApiError(String message) {
+        log.debug("Start convert message to ApiError");
+        int contentExists = message.indexOf("content:");
+        ApiError apiError = new ApiError(
+                500, "BotInternalError",
+                "I'm, sorry. I cannot parse api error message from remote service :(",
+                "Cannot parse api error message from remote service",
+                "Something went wrong", Collections.singletonList(message));
+        if (contentExists != -1) {
+            log.debug("'Content' exists. Try to parse ApiError from message");
+            String apiMessage = message.substring(contentExists + 8);
+            ObjectMapper mapper = new ObjectMapper();
+            try {
+                apiError = mapper.readValue(apiMessage, ApiError.class);
+            } catch (IOException e) {
+                log.debug("Parsing ApiError failed. Create Default ApiError");
+                apiError = new ApiError(
+                        500, "BotInternalError",
+                        "I'm, sorry. I cannot parse api error message from remote service :(",
+                        "Cannot parse api error message from remote service",
+                        "Something went wrong",
+                        Collections.singletonList(message)
+                );
+            }
         }
-        return properties.getProperty(propertyName);
+        return apiError;
     }
 }

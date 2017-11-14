@@ -1,157 +1,203 @@
 package ua.com.juja.microservices.keepers.slackbot.dao.impl;
 
-import org.junit.Before;
+import feign.FeignException;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestTemplate;
 import ua.com.juja.microservices.keepers.slackbot.dao.KeeperRepository;
+import ua.com.juja.microservices.keepers.slackbot.dao.feign.KeepersClient;
 import ua.com.juja.microservices.keepers.slackbot.exception.KeeperExchangeException;
 import ua.com.juja.microservices.keepers.slackbot.model.request.KeeperRequest;
 
 import javax.inject.Inject;
-import java.util.Arrays;
 
 import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.Assert.*;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.junit.Assert.assertArrayEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * @author Nikolay Horushko
  * @author Dmitriy Lyashenko
+ * @author Ivan Shapovalov
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest
 public class RestKeeperRepositoryTest {
 
-    @Inject
-    private KeeperRepository keeperRepository;
-
-    @Inject
-    private RestTemplate restTemplate;
-
-    private MockRestServiceServer mockServer;
-
-    @Value("${keepers.baseURL}")
-    private String urlBaseKeepers;
-    @Value("${keepers.rest.api.version}")
-    private String version;
-    @Value("${keepers.endpoint.keepers}")
-    private String urlKeepers;
-
     @Rule
     public ExpectedException thrown = ExpectedException.none();
-
-    @Before
-    public void setup() {
-        mockServer = MockRestServiceServer.bindTo(restTemplate).build();
-    }
+    @Inject
+    private KeeperRepository keeperRepository;
+    @MockBean
+    private KeepersClient keepersClient;
 
     @Test
-    public void shouldReturnKeeperIdWhenSendAddKeeperToKeepersService() {
+    public void addKeeperWhenKeepersServiceReturnCorrectData() {
         //given
-        String expectedRequestBody = "{\"from\":\"qwer\",\"uuid\":\"67ui\",\"direction\":\"teams\"}";
-        String expectedRequestHeader = "application/json";
-        mockServer.expect(requestTo(urlBaseKeepers + version + urlKeepers))
-                .andExpect(method(HttpMethod.POST))
-                .andExpect(request -> assertThat(request.getHeaders().getContentType().toString(), containsString(expectedRequestHeader)))
-                .andExpect(request -> assertThat(request.getBody().toString(), equalTo(expectedRequestBody)))
-                .andRespond(withSuccess("[\"1000\"]", MediaType.APPLICATION_JSON));
-        //when
-        String[] result = keeperRepository.addKeeper(new KeeperRequest("qwer", "67ui", "teams"));
+        KeeperRequest keeperRequest = new KeeperRequest("uuid-from", "uuid1", "direction");
+        String[] expected = {"1000"};
+        when(keepersClient.addKeeper(keeperRequest)).thenReturn(expected);
 
-        // then
-        mockServer.verify();
-        assertEquals(result.length, 1);
-        assertEquals("[1000]", Arrays.toString(result));
+        //when
+        String[] actual = keeperRepository.addKeeper(keeperRequest);
+
+        //then
+        assertArrayEquals(expected, actual);
+        verify(keepersClient).addKeeper(keeperRequest);
+        verifyNoMoreInteractions(keepersClient);
     }
 
     @Test
-    public void shouldThrowExceptionWhenSendAddKeeperToKeepersServiceThrowException() {
-        // given
-        String expectedRequestBody = "{\"from\":\"qwer\",\"uuid\":\"67ui\",\"direction\":\"teams\"}";
-        String expectedRequestHeader = "application/json";
-        mockServer.expect(requestTo(urlBaseKeepers + version + urlKeepers))
-                .andExpect(method(HttpMethod.POST))
-                .andExpect(request -> assertThat(request.getHeaders().getContentType().toString(), containsString(expectedRequestHeader)))
-                .andExpect(request -> assertThat(request.getBody().toString(), equalTo(expectedRequestBody)))
-                .andRespond(withBadRequest().body("{\"httpStatus\":400,\"internalErrorCode\":1," +
-                        "\"clientMessage\":\"Oops something went wrong :(\"," +
-                        "\"developerMessage\":\"General exception for this service\"," +
-                        "\"exceptionMessage\":\"very big and scare error\",\"detailErrors\":[]}"));
-        //then
+    public void addKeeperWhenKeepersServiceThrowExceptionWithCorrectContent() {
+        //given
+        String expectedJsonResponseBody =
+                "status 400 reading KeepersClient#addKeeper(KeeperRequest); content:" +
+                        "{\"httpStatus\":400,\n" +
+                        "\"internalErrorCode\":1,\n" +
+                        "\"clientMessage\":\"Oops something went wrong :(\",\n" +
+                        "\"developerMessage\":\"General exception for this service\",\n" +
+                        "\"exceptionMessage\":\"very big and scare error\",\n" +
+                        "\"detailErrors\":[]\n" +
+                        "}";
+        KeeperRequest keeperRequest = new KeeperRequest("uuid-from", "uuid1", "direction");
+        FeignException feignException = mock(FeignException.class);
+        when(feignException.getMessage()).thenReturn(expectedJsonResponseBody);
+        when(keepersClient.addKeeper(keeperRequest)).thenThrow(feignException);
+
         thrown.expect(KeeperExchangeException.class);
         thrown.expectMessage(containsString("Oops something went wrong :("));
-        //when
-        keeperRepository.addKeeper(new KeeperRequest("qwer", "67ui", "teams"));
+
+        try {
+            //when
+            keeperRepository.addKeeper(keeperRequest);
+        } finally {
+            //then
+            verify(keepersClient).addKeeper(keeperRequest);
+            verifyNoMoreInteractions(keepersClient);
+        }
     }
 
     @Test
-    public void shouldReturnKeeperIdWhenSendDeactivateKeeperToKeepersService() {
+    public void addKeeperWhenKeepersServiceThrowExceptionWithIncorrectContent() {
         //given
-        String expectedRequestBody = "{\"from\":\"qwer\",\"uuid\":\"67ui\",\"direction\":\"teams\"}";
-        String expectedRequestHeader = "application/json";
-        mockServer.expect(requestTo(urlBaseKeepers + version + urlKeepers))
-                .andExpect(method(HttpMethod.PUT))
-                .andExpect(request -> assertThat(request.getHeaders().getContentType().toString(), containsString(expectedRequestHeader)))
-                .andExpect(request -> assertThat(request.getBody().toString(), equalTo(expectedRequestBody)))
-                .andRespond(withSuccess("[\"1000\"]", MediaType.APPLICATION_JSON));
-        //when
-        String[] result = keeperRepository.deactivateKeeper(new KeeperRequest("qwer", "67ui", "teams"));
+        String expectedJsonResponseBody =
+                "status 400 reading UsersClient#findUsersBySlackNames(); content: \n";
+        KeeperRequest keeperRequest = new KeeperRequest("uuid-from", "uuid1", "direction");
+        FeignException feignException = mock(FeignException.class);
+        when(feignException.getMessage()).thenReturn(expectedJsonResponseBody);
+        when(keepersClient.addKeeper(keeperRequest)).thenThrow(feignException);
 
-        // then
-        mockServer.verify();
-        assertEquals(result.length, 1);
-        assertEquals("[1000]", Arrays.toString(result));
+        thrown.expect(KeeperExchangeException.class);
+        thrown.expectMessage(containsString("I'm, sorry. I cannot parse api error message from remote service :("));
+
+        try {
+            //when
+            keeperRepository.addKeeper(keeperRequest);
+        } finally {
+            //then
+            verify(keepersClient).addKeeper(keeperRequest);
+            verifyNoMoreInteractions(keepersClient);
+        }
     }
 
     @Test
-    public void shouldThrowExceptionWhenSendDeactivateKeeperToKeepersServiceThrowException() {
-        // given
-        String expectedRequestBody = "{\"from\":\"qwer\",\"uuid\":\"67ui\",\"direction\":\"teams\"}";
-        String expectedRequestHeader = "application/json";
-        mockServer.expect(requestTo(urlBaseKeepers + version + urlKeepers))
-                .andExpect(method(HttpMethod.PUT))
-                .andExpect(request -> assertThat(request.getHeaders().getContentType().toString(), containsString(expectedRequestHeader)))
-                .andExpect(request -> assertThat(request.getBody().toString(), equalTo(expectedRequestBody)))
-                .andRespond(withBadRequest().body("{\"httpStatus\":400,\"internalErrorCode\":1," +
-                        "\"clientMessage\":\"Oops something went wrong :(\"," +
-                        "\"developerMessage\":\"General exception for this service\"," +
-                        "\"exceptionMessage\":\"very big and scare error\",\"detailErrors\":[]}"));
+    public void deactivateKeeperWhenKeepersServiceReturnCorrectId() {
+        //given
+        KeeperRequest keeperRequest = new KeeperRequest("uuid-from", "uuid1", "direction");
+        String[] expected = {"1000"};
+        when(keepersClient.deactivateKeeper(keeperRequest)).thenReturn(expected);
+
+        //when
+        String[] actual = keeperRepository.deactivateKeeper(keeperRequest);
+
         //then
+        assertArrayEquals(expected, actual);
+        verify(keepersClient).deactivateKeeper(keeperRequest);
+        verifyNoMoreInteractions(keepersClient);
+    }
+
+    @Test
+    public void deactivateKeeperWhenKeepersServiceThrowExceptionWithCorrectContent() {
+        //given
+        String expectedJsonResponseBody =
+                "status 400 reading KeepersClient#deactivateKeeper(KeeperRequest); content:" +
+                        "{\"httpStatus\":400,\n" +
+                        "\"internalErrorCode\":1,\n" +
+                        "\"clientMessage\":\"Oops something went wrong :(\",\n" +
+                        "\"developerMessage\":\"General exception for this service\",\n" +
+                        "\"exceptionMessage\":\"very big and scare error\",\n" +
+                        "\"detailErrors\":[]\n" +
+                        "}";
+        KeeperRequest keeperRequest = new KeeperRequest("uuid-from", "uuid1", "direction");
+        FeignException feignException = mock(FeignException.class);
+        when(feignException.getMessage()).thenReturn(expectedJsonResponseBody);
+        when(keepersClient.deactivateKeeper(keeperRequest)).thenThrow(feignException);
+
         thrown.expect(KeeperExchangeException.class);
         thrown.expectMessage(containsString("Oops something went wrong :("));
-        //when
-        keeperRepository.deactivateKeeper(new KeeperRequest("qwer", "67ui", "teams"));
+
+        try {
+            //when
+            keeperRepository.deactivateKeeper(keeperRequest);
+        } finally {
+            //then
+            verify(keepersClient).deactivateKeeper(keeperRequest);
+            verifyNoMoreInteractions(keepersClient);
+        }
     }
 
     @Test
-    public void shouldReturnKeeperDirections() {
+    public void getKeeperDirectionsWhenKeepersServiceReturnCorrectIds() {
         //given
-        String expectedRequestBody = "{\"from\":\"fromUser\",\"uuid\":\"0000-1111\",\"direction\":\"direction1\"}";
-        String expectedRequestHeader = "application/json";
-        mockServer.expect(requestTo(urlBaseKeepers + version + urlKeepers + "/0000-1111"))
-                .andExpect(method(HttpMethod.GET))
-                .andExpect(request -> assertThat(request.getHeaders().getContentType().toString(), containsString(expectedRequestHeader)))
-                .andExpect(request -> assertThat(request.getBody().toString(), equalTo(expectedRequestBody)))
-                .andRespond(withSuccess("[\"direction1\"]", MediaType.APPLICATION_JSON));
+        String uuid = "uuid-keeper";
+        KeeperRequest keeperRequest = new KeeperRequest("uuid-from", uuid, "direction");
+        String[] expected = {"direction1", "direction2", "direction3"};
+        when(keepersClient.getKeeperDirections(keeperRequest, uuid)).thenReturn(expected);
+
         //when
-        String[] actualList = keeperRepository.getKeeperDirections(
-                new KeeperRequest("fromUser", "0000-1111", "direction1"));
-        // then
-        mockServer.verify();
-        assertEquals("[direction1]", Arrays.toString(actualList));
+        String[] actual = keeperRepository.getKeeperDirections(keeperRequest);
+
+        //then
+        assertArrayEquals(expected, actual);
+        verify(keepersClient).getKeeperDirections(keeperRequest, uuid);
+        verifyNoMoreInteractions(keepersClient);
+    }
+
+    @Test
+    public void getKeeperDirectionsWhenKeepersServiceThrowExceptionWithCorrectContent() {
+        //given
+        String expectedJsonResponseBody =
+                "status 400 reading KeepersClient#getKeeperDirections(KeeperRequest); content:" +
+                        "{\"httpStatus\":400,\n" +
+                        "\"internalErrorCode\":1,\n" +
+                        "\"clientMessage\":\"Oops something went wrong :(\",\n" +
+                        "\"developerMessage\":\"General exception for this service\",\n" +
+                        "\"exceptionMessage\":\"very big and scare error\",\n" +
+                        "\"detailErrors\":[]\n" +
+                        "}";
+        String uuid = "uuid-keeper";
+        KeeperRequest keeperRequest = new KeeperRequest("uuid-from", uuid, "direction");
+        FeignException feignException = mock(FeignException.class);
+        when(feignException.getMessage()).thenReturn(expectedJsonResponseBody);
+        when(keepersClient.getKeeperDirections(keeperRequest, uuid)).thenThrow(feignException);
+
+        thrown.expect(KeeperExchangeException.class);
+        thrown.expectMessage(containsString("Oops something went wrong :("));
+
+        try {
+            //when
+            keeperRepository.getKeeperDirections(keeperRequest);
+        } finally {
+            //then
+            verify(keepersClient).getKeeperDirections(keeperRequest, uuid);
+            verifyNoMoreInteractions(keepersClient);
+        }
     }
 }

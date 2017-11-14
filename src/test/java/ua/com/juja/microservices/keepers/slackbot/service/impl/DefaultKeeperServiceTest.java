@@ -17,7 +17,8 @@ import ua.com.juja.microservices.keepers.slackbot.model.request.KeeperRequest;
 import ua.com.juja.microservices.keepers.slackbot.service.KeeperService;
 
 import javax.inject.Inject;
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.hamcrest.CoreMatchers.containsString;
@@ -36,26 +37,24 @@ import static org.mockito.Mockito.when;
 public class DefaultKeeperServiceTest {
     @Rule
     public ExpectedException thrown = ExpectedException.none();
-    UserDTO fromUser;
+    private UserDTO fromUser;
     @MockBean
     private KeeperRepository keeperRepository;
     @MockBean
     private SlackNameHandlerService slackNameHandlerService;
     @Inject
     private KeeperService keeperService;
-    private List<UserDTO> usersInText;
 
     @Before
     public void setup() {
         MockitoAnnotations.initMocks(this);
         fromUser = new UserDTO("uuid0", "@from");
-        usersInText = new ArrayList<>();
-        usersInText.add(new UserDTO("uuid1", "@slack_name"));
     }
 
     @Test
     public void shouldSaveKeeperAndReturnValidText() {
         //given
+        List<UserDTO> usersInText = Collections.singletonList(new UserDTO("uuid1", "@slack_name"));
         String[] expectedKeeperId = {"100"};
         final String KEEPER_ADD_COMMAND_TEXT = "@slack_name teams";
         KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid1", "teams");
@@ -75,6 +74,7 @@ public class DefaultKeeperServiceTest {
     @Test
     public void keeperAddShouldReturnERRORText() {
         //given
+        List<UserDTO> usersInText = Collections.singletonList(new UserDTO("uuid1", "@slack_name"));
         String[] expectedEmptyArray = {};
         final String KEEPER_ADD_COMMAND_TEXT = "@slack_name teams";
         KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid1", "teams");
@@ -94,7 +94,7 @@ public class DefaultKeeperServiceTest {
     @Test
     public void keeperAddWhenZeroUsersInTextShouldReturnERRORText() {
         //given
-        usersInText.clear();
+        List<UserDTO> usersInText = Collections.emptyList();
         final String KEEPER_ADD_COMMAND_TEXT = "teams";
         when(slackNameHandlerService.createSlackParsedCommand("@from", KEEPER_ADD_COMMAND_TEXT))
                 .thenReturn(new SlackParsedCommand(fromUser, KEEPER_ADD_COMMAND_TEXT, usersInText));
@@ -103,16 +103,87 @@ public class DefaultKeeperServiceTest {
         thrown.expectMessage(containsString("We didn't find any slack name in your command. " +
                 "'teams' You must write the user's slack name to perform the action with keepers."));
 
-        //when
-        keeperService.sendKeeperAddRequest("@from", KEEPER_ADD_COMMAND_TEXT);
+        try {
+            //when
+            keeperService.sendKeeperAddRequest("@from", KEEPER_ADD_COMMAND_TEXT);
+        } finally {
+            //then
+            verify(slackNameHandlerService).createSlackParsedCommand("@from", KEEPER_ADD_COMMAND_TEXT);
+            verifyNoMoreInteractions(slackNameHandlerService);
+        }
+    }
 
-        //then
-        verify(slackNameHandlerService).createSlackParsedCommand("@from", KEEPER_ADD_COMMAND_TEXT);
+    @Test
+    public void keeperAddWhenSeveralUsersInTextShouldReturnERRORText() {
+        //given
+        List<UserDTO> usersInText = Arrays.asList(new UserDTO("uuid1", "@slack_name"),
+                new UserDTO("uuid2", "@slack_name2"));
+        final String KEEPER_ADD_COMMAND_TEXT = "@user1 @user2 teams";
+        when(slackNameHandlerService.createSlackParsedCommand("@from", KEEPER_ADD_COMMAND_TEXT))
+                .thenReturn(new SlackParsedCommand(fromUser, KEEPER_ADD_COMMAND_TEXT, usersInText));
+
+        thrown.expect(WrongCommandFormatException.class);
+        thrown.expectMessage(containsString("We found 2 slack names in your command: '@user1 @user2 teams' " +
+                "You can not perform actions with several slack names."));
+
+        try {
+            //when
+            keeperService.sendKeeperAddRequest("@from", KEEPER_ADD_COMMAND_TEXT);
+        } finally {
+            //then
+            verify(slackNameHandlerService).createSlackParsedCommand("@from", KEEPER_ADD_COMMAND_TEXT);
+            verifyNoMoreInteractions(slackNameHandlerService);
+        }
+    }
+
+    @Test
+    public void keeperAddWhenZeroDirectionsInTextShouldReturnERRORText() {
+        //given
+        List<UserDTO> usersInText = Collections.singletonList(new UserDTO("uuid1", "@slack_name"));
+        final String KEEPER_ADD_COMMAND_TEXT = "@user1";
+        when(slackNameHandlerService.createSlackParsedCommand("@from", KEEPER_ADD_COMMAND_TEXT))
+                .thenReturn(new SlackParsedCommand(fromUser, KEEPER_ADD_COMMAND_TEXT, usersInText));
+
+        thrown.expect(WrongCommandFormatException.class);
+        thrown.expectMessage(containsString("We didn't find direction in your command: '@user1' " +
+                "You must write the direction to perform the action with keepers."));
+
+        try {
+            //when
+            keeperService.sendKeeperAddRequest("@from", KEEPER_ADD_COMMAND_TEXT);
+        } finally {
+            //then
+            verify(slackNameHandlerService).createSlackParsedCommand("@from", KEEPER_ADD_COMMAND_TEXT);
+            verifyNoMoreInteractions(slackNameHandlerService);
+        }
+    }
+
+    @Test
+    public void keeperAddWhenSeveralDirectionsInTextShouldReturnERRORText() {
+        //given
+        List<UserDTO> usersInText = Collections.singletonList(new UserDTO("uuid1", "@slack_name"));
+        final String KEEPER_ADD_COMMAND_TEXT = "@user1 teams keepers";
+        when(slackNameHandlerService.createSlackParsedCommand("@from", KEEPER_ADD_COMMAND_TEXT))
+                .thenReturn(new SlackParsedCommand(fromUser, KEEPER_ADD_COMMAND_TEXT, usersInText));
+
+        thrown.expect(WrongCommandFormatException.class);
+        thrown.expectMessage(containsString("We found several directions in your command: 'teams keepers' " +
+                "You can perform the action with keepers on one direction only."));
+
+        try {
+            //when
+            keeperService.sendKeeperAddRequest("@from", KEEPER_ADD_COMMAND_TEXT);
+        } finally {
+            //then
+            verify(slackNameHandlerService).createSlackParsedCommand("@from", KEEPER_ADD_COMMAND_TEXT);
+            verifyNoMoreInteractions(slackNameHandlerService);
+        }
     }
 
     @Test
     public void shouldDeactivateKeeperAndReturnValidText() {
         //given
+        List<UserDTO> usersInText = Collections.singletonList(new UserDTO("uuid1", "@slack_name"));
         String[] expectedKeeperId = {"100"};
         final String KEEPER_DEACTIVATE_COMMAND_TEXT = "@slack_name teams";
         KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid1", "teams");
@@ -132,6 +203,7 @@ public class DefaultKeeperServiceTest {
     @Test
     public void keeperDeactivateShouldReturnERRORText() {
         //given
+        List<UserDTO> usersInText = Collections.singletonList(new UserDTO("uuid1", "@slack_name"));
         String[] expectedEmptyArray = {};
         final String KEEPER_DEACTIVATE_COMMAND_TEXT = "@slack_name teams";
         KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid1", "teams");
@@ -151,6 +223,7 @@ public class DefaultKeeperServiceTest {
     @Test
     public void getKeeperDirections() {
         //Given
+        List<UserDTO> usersInText = Collections.singletonList(new UserDTO("uuid1", "@slack_name"));
         String[] expected = {"direction1"};
         final String GET_KEEPER_DIRECTIONS_COMMAND_TEXT = "@slack_name";
         KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid1", "");
@@ -170,8 +243,7 @@ public class DefaultKeeperServiceTest {
     @Test
     public void getKeeperDirectionsWhenFromUserInTextShouldThrowException() {
         //Given
-        usersInText.clear();
-        usersInText.add(new UserDTO("uuid0", "@from"));
+        List<UserDTO> usersInText = Collections.singletonList(new UserDTO("uuid0", "@from"));
         final String GET_KEEPER_DIRECTIONS_COMMAND_TEXT = "@from";
         when(slackNameHandlerService.createSlackParsedCommand("@from", GET_KEEPER_DIRECTIONS_COMMAND_TEXT))
                 .thenReturn(new SlackParsedCommand(fromUser, GET_KEEPER_DIRECTIONS_COMMAND_TEXT, usersInText));
@@ -191,6 +263,7 @@ public class DefaultKeeperServiceTest {
     @Test
     public void getKeeperDirectionsWithEmptyResult() {
         //Given
+        List<UserDTO> usersInText = Collections.singletonList(new UserDTO("uuid1", "@slack_name"));
         String[] emptyArray = {};
         final String GET_KEEPER_DIRECTIONS_COMMAND_TEXT = "@slack_name";
         KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid1", "");
@@ -210,8 +283,7 @@ public class DefaultKeeperServiceTest {
     @Test
     public void getMyDirectionsShouldReturnValidText() {
         //Given
-        usersInText.clear();
-        usersInText.add(new UserDTO("uuid", "@from"));
+        List<UserDTO> usersInText = Collections.singletonList(new UserDTO("uuid0", "@from"));
         String[] expected = {"direction1"};
         KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid0", "");
         when(keeperRepository.getKeeperDirections(keeperRequest)).thenReturn(expected);
@@ -231,8 +303,7 @@ public class DefaultKeeperServiceTest {
     @Test
     public void getMyDirectionsShouldReturnEmptyResult() {
         //Given
-        usersInText.clear();
-        usersInText.add(new UserDTO("uuid0", "@from"));
+        List<UserDTO> usersInText = Collections.singletonList(new UserDTO("uuid0", "@from"));
         String[] emptyArray = {};
         KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid0", "");
         when(keeperRepository.getKeeperDirections(keeperRequest)).thenReturn(emptyArray);

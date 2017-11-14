@@ -2,7 +2,6 @@ package ua.com.juja.microservices.keepers.slackbot.service.impl;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ua.com.juja.microservices.keepers.slackbot.model.SlackParsedCommand;
 import ua.com.juja.microservices.keepers.slackbot.model.dto.UserDTO;
@@ -28,15 +27,6 @@ public class SlackNameHandlerService {
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
     private UserService userService;
-
-    /**
-     * Slack name cannot be longer than 21 characters and
-     * can only contain letters, numbers, periods, hyphens, and underscores.
-     * ([a-z0-9\.\_\-]){1,21}
-     * quick test regExp http://regexr.com/
-     */
-    @Value("${keepers.slackNamePattern}")
-    private String slackNamePattern;
 
     @Inject
     public SlackNameHandlerService(UserService userService) {
@@ -69,7 +59,7 @@ public class SlackNameHandlerService {
 
     private List<String> receiveAllSlackNames(String text) {
         List<String> result = new ArrayList<>();
-        Pattern pattern = Pattern.compile(slackNamePattern);
+        Pattern pattern = Pattern.compile(SlackParsedCommand.SLACK_NAME_PATTERN);
         Matcher matcher = pattern.matcher(text);
         while (matcher.find()) {
             result.add(matcher.group());
