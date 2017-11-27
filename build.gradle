@@ -1,18 +1,19 @@
 buildscript {
     repositories {
         mavenCentral()
+        mavenLocal()
     }
     dependencies {
-        classpath("org.springframework.boot:spring-boot-gradle-plugin:1.5.1.RELEASE")
+        classpath 'org.springframework.boot:spring-boot-gradle-plugin:1.5.1.RELEASE'
     }
 }
 
 repositories {
     mavenCentral()
+    mavenLocal()
 }
 
-group 'ua.com.juja'
-version '1.0-SNAPSHOT'
+group 'juja'
 
 apply plugin: 'java'
 apply plugin: 'idea'
@@ -20,13 +21,14 @@ apply plugin: 'spring-boot'
 
 jar {
     baseName = "keepers-slack-bot"
-    version = "1"
+    version = "0.1.0"
 }
 
-description = "microservices-gamification-slack-bot"
+description = "keepers-slack-bot"
 
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
+
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
 }
