@@ -25,6 +25,7 @@ import java.io.PrintWriter;
  * @author Dmitriy Lyashenko
  * @author Konstantin Sergey
  * @author Ivan Shapovalov
+ * @author Oleksii Skachkov
  */
 @RestController
 @RequestMapping(value = "${keepers.slackBot.rest.api.version}" + "${keepers.slackBot.baseCommandsUrl}")
@@ -47,22 +48,22 @@ public class KeepersSlackCommandController {
 
     @PostMapping(value = "${keepers.slackBot.endpoint.keeperAdd}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public void addKeeper(@RequestParam("token") String token,
-                          @RequestParam("user_name") String fromUser,
+                          @RequestParam("user_id") String fromUserId,
                           @RequestParam("text") String text,
                           @RequestParam("response_url") String responseUrl,
                           HttpServletResponse httpServletResponse) throws IOException {
         try {
             logger.debug("Received slash command KeeperAdd: from user: [{}] command: [{}] token: [{}] responseUrl: [{}]",
-                    fromUser, text, token, responseUrl);
+                    fromUserId, text, token, responseUrl);
 
             if (!token.equals(slackToken)) {
-                logger.warn("Received invalid slack token: [{}] in command KeeperAdd for user: [{}]", token, fromUser);
+                logger.warn("Received invalid slack token: [{}] in command KeeperAdd for user: [{}]", token, fromUserId);
                 sendQuickResponse(httpServletResponse, SORRY_MESSAGE);
             } else {
                 sendQuickResponse(httpServletResponse, IN_PROGRESS);
-                String response = keeperService.sendKeeperAddRequest(fromUser, text);
+                String response = keeperService.sendKeeperAddRequest(fromUserId, text);
                 logger.info("KeeperAdd command processed : user: [{}] text: [{}] and sent response into slack: [{}]",
-                        fromUser, text, response);
+                        fromUserId, text, response);
                 sendDelayedResponse(responseUrl, response);
             }
         } catch (BaseBotException bex) {
@@ -74,22 +75,22 @@ public class KeepersSlackCommandController {
 
     @PostMapping(value = "${keepers.slackBot.endpoint.keeperDeactivate}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public void deactivateKeeper(@RequestParam("token") String token,
-                                 @RequestParam("user_name") String fromUser,
+                                 @RequestParam("user_id") String fromUserId,
                                  @RequestParam("text") String text,
                                  @RequestParam("response_url") String responseUrl,
                                  HttpServletResponse httpServletResponse) {
         try {
             logger.debug("Received slash command KeeperDeactivate: from user: [{}] command: [{}] token: [{}]",
-                    fromUser, text, token);
+                    fromUserId, text, token);
 
             if (!token.equals(slackToken)) {
-                logger.warn("Received invalid slack token: [{}] in command KeeperDeactivate for user: [{}]", token, fromUser);
+                logger.warn("Received invalid slack token: [{}] in command KeeperDeactivate for user: [{}]", token, fromUserId);
                 sendQuickResponse(httpServletResponse, SORRY_MESSAGE);
             } else {
                 sendQuickResponse(httpServletResponse, IN_PROGRESS);
-                String response = keeperService.sendKeeperDeactivateRequest(fromUser, text);
+                String response = keeperService.sendKeeperDeactivateRequest(fromUserId, text);
                 logger.info("KeeperDeactivate command processed : user: [{}] text: [{}] and sent response into slack: [{}]",
-                        fromUser, text, response);
+                        fromUserId, text, response);
                 sendDelayedResponse(responseUrl, response);
             }
         } catch (BaseBotException bex) {
@@ -101,23 +102,23 @@ public class KeepersSlackCommandController {
 
     @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public void getKeeperDirections(@RequestParam("token") String token,
-                                    @RequestParam("user_name") String fromUser,
+                                    @RequestParam("user_id") String fromUserId,
                                     @RequestParam("text") String text,
                                     @RequestParam("response_url") String responseUrl,
                                     HttpServletResponse httpServletResponse) {
         try {
             logger.debug("Received slash command GetKeeperDirections: from user: [{}] command: [{}] token: [{}]",
-                    fromUser, text, token);
+                    fromUserId, text, token);
 
             if (!token.equals(slackToken)) {
                 logger.warn("Received invalid slack token: [{}] in command getKeeperDirections for user: [{}]", token,
-                        fromUser);
+                        fromUserId);
                 sendQuickResponse(httpServletResponse, SORRY_MESSAGE);
             } else {
                 sendQuickResponse(httpServletResponse, IN_PROGRESS);
-                String response = keeperService.getKeeperDirections(fromUser, text);
+                String response = keeperService.getKeeperDirections(fromUserId, text);
                 logger.info("GetKeeperDirections command processed : user: [{}] text: [{}] and sent response to slack: [{}]",
-                        fromUser, text, response);
+                        fromUserId, text, response);
                 sendDelayedResponse(responseUrl, response);
             }
         } catch (BaseBotException bex) {
@@ -130,19 +131,19 @@ public class KeepersSlackCommandController {
     @PostMapping(value = "${keepers.slackBot.endpoint.getMyDirections}", consumes = MediaType
             .APPLICATION_FORM_URLENCODED_VALUE)
     public void getMyDirections(@RequestParam("token") String token,
-                                @RequestParam("user_name") String fromUser,
+                                @RequestParam("user_id") String fromUserId,
                                 @RequestParam("response_url") String responseUrl,
                                 HttpServletResponse httpServletResponse) {
         try {
-            logger.debug("Received slash command GetMyDirections: from user: [{}] token: [{}]", fromUser, token);
+            logger.debug("Received slash command GetMyDirections: from user: [{}] token: [{}]", fromUserId, token);
             if (!token.equals(slackToken)) {
-                logger.warn("Received invalid slack token: [{}] in command getMyDirections for user: [{}]", token, fromUser);
+                logger.warn("Received invalid slack token: [{}] in command getMyDirections for user: [{}]", token, fromUserId);
                 sendQuickResponse(httpServletResponse, SORRY_MESSAGE);
             } else {
                 sendQuickResponse(httpServletResponse, IN_PROGRESS);
-                String response = keeperService.getMyDirections(fromUser);
+                String response = keeperService.getMyDirections(fromUserId);
                 logger.info("GetMyDirections command processed : user: [{}] and sent response to slack: [{}]",
-                        fromUser, response);
+                        fromUserId, response);
                 sendDelayedResponse(responseUrl, response);
             }
         } catch (BaseBotException bex) {

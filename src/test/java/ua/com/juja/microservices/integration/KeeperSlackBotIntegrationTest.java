@@ -41,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Nikolay Horushko
  * @author Dmitriy Lyashenko
  * @author Ivan Shapovalov
+ * @author Oleksii Skachkov
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = {KeeperSlackBotApplication.class})
@@ -51,7 +52,7 @@ public class KeeperSlackBotIntegrationTest {
     private static final String IN_PROGRESS = "In progress...";
     private static final String EXAMPLE_URL = "http://example.com";
     private static final String TOKEN_WRONG = "wrongSlackToken";
-    private static final String FROM_USER_SLACK_NAME_WITHOUT_AT = "from-user";
+    private static final String FROM_USER_SLACK_ID_WITHOUT_AT = "from-id";
 
     @Value("${keepers.slackBot.slack.slashCommandToken}")
     private String tokenCorrect;
@@ -75,15 +76,15 @@ public class KeeperSlackBotIntegrationTest {
     private String urlBaseUsers;
     @Value("${users.rest.api.version}")
     private String usersVersion;
-    @Value("${users.endpoint.usersBySlackNames}")
+    @Value("${users.endpoint.usersBySlackIds}")
     private String urlGetUsers;
 
     @Value("${keepers.slackBot.rest.api.version}")
     private String slackBotVersion;
 
-    private UserDTO userFrom = new UserDTO("f2034f11-561a-4e01-bfcf-ec615c1ba61a", "@from-user");
-    private UserDTO user1 = new UserDTO("f2034f22-562b-4e02-bfcf-ec615c1ba62b", "@slack1");
-    private UserDTO user2 = new UserDTO("f2034f33-563c-4e03-bfcf-ec615c1ba63c", "@slack2");
+    private UserDTO userFrom = new UserDTO("f2034f11-561a-4e01-bfcf-ec615c1ba61a", "from-id");
+    private UserDTO user1 = new UserDTO("f2034f22-562b-4e02-bfcf-ec615c1ba62b", "slack-id1");
+    private UserDTO user2 = new UserDTO("f2034f33-563c-4e03-bfcf-ec615c1ba63c", "slack-id2");
 
     @Before
     public void setup() {
@@ -93,7 +94,7 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void onReceiveSlashCommandKeeperAddSendOkRichMessage() throws Exception {
         //Given
-        final String KEEPER_ADD_COMMAND_TEXT = "@slack1 teams";
+        final String KEEPER_ADD_COMMAND_TEXT = "<@slack-id1> teams";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
         final String EXPECTED_REQUEST_TO_KEEPERS = "{" +
                 "\"from\":\"f2034f11-561a-4e01-bfcf-ec615c1ba61a\"," +
@@ -104,7 +105,7 @@ public class KeeperSlackBotIntegrationTest {
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"Thanks, we added a new Keeper: @slack1 in direction: teams\"," +
+                "\"text\":\"Thanks, we added a new Keeper: slack-id1 in direction: teams\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
                 "\"response_type\":null" +
@@ -125,9 +126,9 @@ public class KeeperSlackBotIntegrationTest {
     }
 
     @Test
-    public void onReceiveSlashCommandKeeperAddWhenFromUserSlackNameWithoutATSendOkRichMessage() throws Exception {
+    public void onReceiveSlashCommandKeeperAddWhenFromUserSlackIdWithoutATSendOkRichMessage() throws Exception {
         //Given
-        final String KEEPER_ADD_COMMAND_TEXT = "@slack1 teams";
+        final String KEEPER_ADD_COMMAND_TEXT = "<@slack-id1> teams";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
         final String EXPECTED_REQUEST_TO_KEEPERS = "{" +
                 "\"from\":\"f2034f11-561a-4e01-bfcf-ec615c1ba61a\"," +
@@ -138,7 +139,7 @@ public class KeeperSlackBotIntegrationTest {
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"Thanks, we added a new Keeper: @slack1 in direction: teams\"," +
+                "\"text\":\"Thanks, we added a new Keeper: slack-id1 in direction: teams\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
                 "\"response_type\":null" +
@@ -152,7 +153,7 @@ public class KeeperSlackBotIntegrationTest {
 
         //Then
         mvc.perform(MockMvcRequestBuilders.post(SlackUrlUtils.getUrlTemplate(slackBotVersion + "/commands/keeper/add"),
-                SlackUrlUtils.getUriVars(FROM_USER_SLACK_NAME_WITHOUT_AT, tokenCorrect, "/keeper-add",
+                SlackUrlUtils.getUriVars(FROM_USER_SLACK_ID_WITHOUT_AT, tokenCorrect, "/keeper-add",
                         KEEPER_ADD_COMMAND_TEXT))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isOk())
@@ -173,13 +174,13 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void returnErrorMessageIfKeeperAddCommandConsistTwoOrMoreSlackNames() throws Exception {
         //Given
-        final String KEEPER_ADD_COMMAND_TEXT = "@slack1 @slack2 teams";
+        final String KEEPER_ADD_COMMAND_TEXT = "<@slack-id1> <@slack-id2> teams";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, user2, userFrom);
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"We found 2 slack names in your command: '@slack1 @slack2 teams' " +
-                "You can not perform actions with several slack names.\"," +
+                "\"text\":\"We found 2 slack ids in your command: '<@slack-id1> <@slack-id2> teams' " +
+                "You can not perform actions with several slack ids.\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
                 "\"response_type\":null" +
@@ -200,7 +201,7 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void returnErrorMessageIfKeeperAddCommandConsistTwoOrMoreDirections() throws Exception {
         //Given
-        final String KEEPER_ADD_COMMAND_TEXT = "@slack1 teams else";
+        final String KEEPER_ADD_COMMAND_TEXT = "<@slack-id1> teams else";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
@@ -227,12 +228,12 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void returnErrorMessageIfKeeperAddCommandWithNoConsistDirections() throws Exception {
         //Given
-        final String KEEPER_ADD_COMMAND_TEXT = "@slack1";
+        final String KEEPER_ADD_COMMAND_TEXT = "<@slack-id1>";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"We didn't find direction in your command: '@slack1' " +
+                "\"text\":\"We didn't find direction in your command: '<@slack-id1>' " +
                 "You must write the direction to perform the action with keepers.\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
@@ -254,7 +255,7 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void returnClientErrorMessageForKeeperAddWhenUserServiceIsFail() throws Exception {
         //Given
-        final String KEEPER_ADD_COMMAND_TEXT = "@slack1 teams";
+        final String KEEPER_ADD_COMMAND_TEXT = "<@slack-id1> teams";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
@@ -280,7 +281,7 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void returnClientErrorMessageForKeeperAddWhenKeepersServiceIsFail() throws Exception {
         //Given
-        final String KEEPER_ADD_COMMAND_TEXT = "@slack1 teams";
+        final String KEEPER_ADD_COMMAND_TEXT = "<@slack-id1> teams";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
         final String EXPECTED_REQUEST_TO_KEEPERS = "{" +
                 "\"from\":\"f2034f11-561a-4e01-bfcf-ec615c1ba61a\"," +
@@ -312,13 +313,13 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void keeperAddWhenSlackAnsweredFail() throws Exception {
         //Given
-        final String KEEPER_ADD_COMMAND_TEXT = "@slack1 @slack2 teams";
+        final String KEEPER_ADD_COMMAND_TEXT = "<@slack-id1> <@slack-id2> teams";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, user2, userFrom);
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"We found 2 slack names in your command: '@slack1 @slack2 teams' " +
-                "You can not perform actions with several slack names.\"," +
+                "\"text\":\"We found 2 slack ids in your command: '<@slack-id1> <@slack-id2> teams' " +
+                "You can not perform actions with several slack ids.\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
                 "\"response_type\":null" +
@@ -339,7 +340,7 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void onReceiveSlashCommandKeeperDeactivateReturnOkRichMessage() throws Exception {
         //Given
-        final String KEEPER_DEACTIVATE_COMMAND_TEXT = "@slack1 teams";
+        final String KEEPER_DEACTIVATE_COMMAND_TEXT = "<@slack-id1> teams";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
         final String EXPECTED_REQUEST_TO_KEEPERS = "{" +
                 "\"from\":\"f2034f11-561a-4e01-bfcf-ec615c1ba61a\"," +
@@ -350,7 +351,7 @@ public class KeeperSlackBotIntegrationTest {
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"Keeper: @slack1 in direction: teams deactivated\"," +
+                "\"text\":\"Keeper: slack-id1 in direction: teams deactivated\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
                 "\"response_type\":null" +
@@ -381,15 +382,15 @@ public class KeeperSlackBotIntegrationTest {
     }
 
     @Test
-    public void returnErrorMessageIfKeeperDeactivateCommandConsistTwoOrMoreSlackNames() throws Exception {
+    public void returnErrorMessageIfKeeperDeactivateCommandConsistTwoOrMoreSlackIds() throws Exception {
         //Given
-        final String KEEPER_DEACTIVATE_COMMAND_TEXT = "@slack1 @slack2 teams";
+        final String KEEPER_DEACTIVATE_COMMAND_TEXT = "<@slack-id1> <@slack-id2> teams";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, user2, userFrom);
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"We found 2 slack names in your command: '@slack1 @slack2 teams' " +
-                "You can not perform actions with several slack names.\"," +
+                "\"text\":\"We found 2 slack ids in your command: '<@slack-id1> <@slack-id2> teams' " +
+                "You can not perform actions with several slack ids.\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
                 "\"response_type\":null" +
@@ -410,7 +411,7 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void returnErrorMessageIfKeeperDeactivateCommandConsistTwoOrMoreDirections() throws Exception {
         //Given
-        final String KEEPER_DEACTIVATE_COMMAND_TEXT = "@slack1 teams else";
+        final String KEEPER_DEACTIVATE_COMMAND_TEXT = "<@slack-id1> teams else";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
@@ -437,12 +438,12 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void returnErrorMessageIfKeeperDeactivateCommandWithNoConsistDirections() throws Exception {
         //Given
-        final String KEEPER_DEACTIVATE_COMMAND_TEXT = "@slack1";
+        final String KEEPER_DEACTIVATE_COMMAND_TEXT = "<@slack-id1>";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"We didn't find direction in your command: '@slack1' " +
+                "\"text\":\"We didn't find direction in your command: '<@slack-id1>' " +
                 "You must write the direction to perform the action with keepers.\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
@@ -464,7 +465,7 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void returnClientErrorMessageForKeeperDeactivateWhenUserServiceIsFail() throws Exception {
         //Given
-        final String KEEPER_DEACTIVATE_COMMAND_TEXT = "@slack1 teams";
+        final String KEEPER_DEACTIVATE_COMMAND_TEXT = "<@slack-id1> teams";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
@@ -490,7 +491,7 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void returnClientErrorMessageForKeeperDeactivateWhenKeepersServiceIsFail() throws Exception {
         //Given
-        final String KEEPER_DISMISS_COMMAND_TEXT = "@slack1 teams";
+        final String KEEPER_DISMISS_COMMAND_TEXT = "<@slack-id1> teams";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
         final String EXPECTED_REQUEST_TO_KEEPERS = "{" +
                 "\"from\":\"f2034f11-561a-4e01-bfcf-ec615c1ba61a\"," +
@@ -522,13 +523,13 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void keeperDeactivateWhenSlackAnsweredFail() throws Exception {
         //Given
-        final String KEEPER_DEACTIVATE_COMMAND_TEXT = "@slack1 @slack2 teams";
+        final String KEEPER_DEACTIVATE_COMMAND_TEXT = "<@slack-id1> <@slack-id2> teams";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, user2, userFrom);
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"We found 2 slack names in your command: '@slack1 @slack2 teams' " +
-                "You can not perform actions with several slack names.\"," +
+                "\"text\":\"We found 2 slack ids in your command: '<@slack-id1> <@slack-id2> teams' " +
+                "You can not perform actions with several slack ids.\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
                 "\"response_type\":null" +
@@ -549,7 +550,7 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void onReceiveSlashCommandKeeperGetDirectionsWhenFromUserNotInTextReturnOkRichMessage() throws Exception {
         //Given
-        final String GET_DIRECTIONS_COMMAND = "@slack1";
+        final String GET_DIRECTIONS_COMMAND = "<@slack-id1>";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
         final String EXPECTED_REQUEST_TO_KEEPERS = "{" +
                 "\"from\":\"f2034f11-561a-4e01-bfcf-ec615c1ba61a\"," +
@@ -560,7 +561,7 @@ public class KeeperSlackBotIntegrationTest {
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"The keeper @slack1 has active directions: [direction1, direction2]\"," +
+                "\"text\":\"The keeper slack-id1 has active directions: [direction1, direction2]\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
                 "\"response_type\":null" +
@@ -583,12 +584,12 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void onReceiveSlashCommandKeeperGetDirectionsWhenFromUserInTextReturnErrorRichMessage() throws Exception {
         //Given
-        final String GET_DIRECTIONS_COMMAND = "@from-user";
+        final String GET_DIRECTIONS_COMMAND = "<@from-id>";
         final List<UserDTO> usersInCommand = Arrays.asList(userFrom, userFrom);
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"Your own slackname in command. To get your own directions use another command\"," +
+                "\"text\":\"Your own slackid in command. To get your own directions use another command\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
                 "\"response_type\":null" +
@@ -609,7 +610,7 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void onReceiveSlashCommandKeeperGetDirectionsWhenFromUserNotInTextReturnEmptyRichMessage() throws Exception {
         //Given
-        final String GET_DIRECTIONS_COMMAND = "@slack1";
+        final String GET_DIRECTIONS_COMMAND = "<@slack-id1>";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
         final String EXPECTED_REQUEST_TO_KEEPERS = "{" +
                 "\"from\":\"f2034f11-561a-4e01-bfcf-ec615c1ba61a\"," +
@@ -620,7 +621,7 @@ public class KeeperSlackBotIntegrationTest {
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"The keeper @slack1 has no active directions.\"," +
+                "\"text\":\"The keeper slack-id1 has no active directions.\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
                 "\"response_type\":null" +
@@ -653,7 +654,7 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void returnClientErrorMessageForKeeperGetDirectionsWhenUserServiceIsFail() throws Exception {
         //Given
-        final String GET_DIRECTIONS_COMMAND = "@slack1";
+        final String GET_DIRECTIONS_COMMAND = "<@slack-id1>";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
@@ -679,7 +680,7 @@ public class KeeperSlackBotIntegrationTest {
     @Test
     public void returnClientErrorMessageForKeeperGetDirectionsWhenKeepersServiceIsFail() throws Exception {
         //Given
-        final String GET_DIRECTIONS_COMMAND = "@slack1";
+        final String GET_DIRECTIONS_COMMAND = "<@slack-id1>";
         final List<UserDTO> usersInCommand = Arrays.asList(user1, userFrom);
         final String EXPECTED_REQUEST_TO_KEEPERS = "{" +
                 "\"from\":\"f2034f11-561a-4e01-bfcf-ec615c1ba61a\"," +
@@ -723,7 +724,7 @@ public class KeeperSlackBotIntegrationTest {
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"The keeper @from-user has active directions: [direction1, direction2]\"," +
+                "\"text\":\"The keeper from-id has active directions: [direction1, direction2]\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
                 "\"response_type\":null" +
@@ -758,7 +759,7 @@ public class KeeperSlackBotIntegrationTest {
         final String EXPECTED_REQUEST_TO_SLACK = "{" +
                 "\"username\":null," +
                 "\"channel\":null," +
-                "\"text\":\"The keeper @from-user has no active directions.\"," +
+                "\"text\":\"The keeper from-id has no active directions.\"," +
                 "\"attachments\":null," +
                 "\"icon_emoji\":null," +
                 "\"response_type\":null" +
@@ -850,15 +851,15 @@ public class KeeperSlackBotIntegrationTest {
     }
 
     private void mockFailUsersService(List<UserDTO> users) throws JsonProcessingException {
-        List<String> slackNames = new ArrayList<>();
+        List<String> slackIds = new ArrayList<>();
         for (UserDTO user : users) {
-            slackNames.add(user.getSlack());
+            slackIds.add(user.getSlackId());
         }
         ObjectMapper mapper = new ObjectMapper();
         mockServer.expect(requestTo(urlBaseUsers + usersVersion + urlGetUsers))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().contentType(APPLICATION_JSON_UTF8))
-                .andExpect(content().string(String.format("{\"slackNames\":%s}", mapper.writeValueAsString(slackNames))))
+                .andExpect(content().string(String.format("{\"slackIds\":%s}", mapper.writeValueAsString(slackIds))))
                 .andRespond(withBadRequest().body("{\"httpStatus\":400,\"internalErrorCode\":1," +
                         "\"clientMessage\":\"Oops something went wrong :(\"," +
                         "\"developerMessage\":\"General exception for this service\"," +
@@ -887,15 +888,15 @@ public class KeeperSlackBotIntegrationTest {
     }
 
     private void mockSuccessUsersService(List<UserDTO> users) throws JsonProcessingException {
-        List<String> slackNames = new ArrayList<>();
+        List<String> slackIds = new ArrayList<>();
         for (UserDTO user : users) {
-            slackNames.add(user.getSlack());
+            slackIds.add(user.getSlackId());
         }
         ObjectMapper mapper = new ObjectMapper();
         mockServer.expect(requestTo(urlBaseUsers + usersVersion + urlGetUsers))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().contentType(APPLICATION_JSON_UTF8))
-                .andExpect(content().string(String.format("{\"slackNames\":%s}", mapper.writeValueAsString(slackNames))))
+                .andExpect(content().string(String.format("{\"slackIds\":%s}", mapper.writeValueAsString(slackIds))))
                 .andRespond(withSuccess(mapper.writeValueAsString(users), MediaType.APPLICATION_JSON_UTF8));
     }
 

@@ -28,6 +28,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 /**
  * @author Nikolay Horushko
+ * @author Oleksii Skachkov
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest
@@ -45,7 +46,7 @@ public class RestUserRepositoryTest {
     private String urlBaseUsers;
     @Value("${users.rest.api.version}")
     private String version;
-    @Value("${users.endpoint.usersBySlackNames}")
+    @Value("${users.endpoint.usersBySlackIds}")
     private String urlGetUsers;
 
     @Rule
@@ -57,22 +58,22 @@ public class RestUserRepositoryTest {
     }
 
     @Test
-    public void shouldReturnListUserDTOWhenSendSlackNameList() {
+    public void shouldReturnListUserDTOWhenSendSlackIdList() {
         //given
-        List<String> slackNames = new ArrayList<>();
-        slackNames.add("@bob.slack");
-        slackNames.add("john.slack");
+        List<String> slackIds = new ArrayList<>();
+        slackIds.add("bob.slack-id");
+        slackIds.add("john.slack-id");
         mockServer.expect(requestTo(urlBaseUsers + version + urlGetUsers))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().contentType(APPLICATION_JSON_UTF8))
-                .andExpect(content().string("{\"slackNames\":[\"@bob.slack\",\"@john.slack\"]}"))
-                .andRespond(withSuccess("[{\"uuid\":\"AAAA123\",\"slack\":\"@bob.slack\"}, " +
-                        "{\"uuid\":\"AAAA321\",\"slack\":\"@john.slack\"}]", MediaType.APPLICATION_JSON_UTF8));
+                .andExpect(content().string("{\"slackIds\":[\"bob.slack-id\",\"john.slack-id\"]}"))
+                .andRespond(withSuccess("[{\"uuid\":\"AAAA123\",\"slackId\":\"bob.slack-id\"}, " +
+                        "{\"uuid\":\"AAAA321\",\"slackId\":\"john.slack-id\"}]", MediaType.APPLICATION_JSON_UTF8));
         //when
-        List<UserDTO> result = userRepository.findUsersBySlackNames(slackNames);
+        List<UserDTO> result = userRepository.findUsersBySlackIds(slackIds);
         // then
         mockServer.verify();
-        assertEquals("[UserDTO(uuid=AAAA123, slack=@bob.slack), UserDTO(uuid=AAAA321, slack=@john.slack)]",
+        assertEquals("[UserDTO(uuid=AAAA123, slackId=bob.slack-id), UserDTO(uuid=AAAA321, slackId=john.slack-id)]",
                 result.toString());
     }
 }
