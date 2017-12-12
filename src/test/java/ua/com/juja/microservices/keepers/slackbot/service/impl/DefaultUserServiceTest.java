@@ -18,6 +18,7 @@ import static org.mockito.BDDMockito.given;
 
 /**
  * @author Nikolay Horushko
+ * @author Oleksii Skachkov
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest
@@ -32,13 +33,13 @@ public class DefaultUserServiceTest {
     @Test
     public void returnUsersListBySlacks() throws Exception {
         //given
-        List<String> slackNamesRequest = Arrays.asList("@slack1", "@slack2");
-        List<UserDTO> usersResponse = Arrays.asList(new UserDTO("uuid1", "@slack1"),
-                new UserDTO("uuid2", "slack2"));
-        given(userRepository.findUsersBySlackNames(slackNamesRequest)).willReturn(usersResponse);
+        List<String> slackIdsRequest = Arrays.asList("slack-id1", "slack-id2");
+        List<UserDTO> usersResponse = Arrays.asList(new UserDTO("uuid1", "slack-id1"),
+                new UserDTO("uuid2", "slack-id2"));
+        given(userRepository.findUsersBySlackIds(slackIdsRequest)).willReturn(usersResponse);
         //when
-        List<UserDTO> result = userService.findUsersBySlackNames(slackNamesRequest);
+        List<UserDTO> result = userService.findUsersBySlackIds(slackIdsRequest);
         //then
-        assertEquals("[UserDTO(uuid=uuid1, slack=@slack1), UserDTO(uuid=uuid2, slack=slack2)]", result.toString());
+        assertEquals("[UserDTO(uuid=uuid1, slackId=slack-id1), UserDTO(uuid=uuid2, slackId=slack-id2)]", result.toString());
     }
 }

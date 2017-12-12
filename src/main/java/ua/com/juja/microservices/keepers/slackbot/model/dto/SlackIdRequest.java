@@ -7,9 +7,10 @@ import java.util.List;
 
 /**
  * @author Nikolay Horushko
+ * @author Oleksii Skachkov
  */
 @Getter
 @AllArgsConstructor
-public class SlackNameRequest {
-    List<String> slackNames;
+public class SlackIdRequest {
+    List<String> slackIds;
 }

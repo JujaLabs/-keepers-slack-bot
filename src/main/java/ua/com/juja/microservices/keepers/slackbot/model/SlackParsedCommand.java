@@ -12,12 +12,16 @@ import java.util.List;
 
 /**
  * @author Konstantin Sergey
+ * @author Oleksii Skachkov
  */
-@ToString(exclude = {"slackNamePattern", "logger"})
+@ToString(exclude = {"slackIdPattern", "logger"})
 @EqualsAndHashCode
 public class SlackParsedCommand {
+    public static final String SLACK_ID_PATTERN = "\\<@(.*?)(\\||\\>)";
+    public static final String SLACK_ID_WRAPPER_PATTERN = "<@%s>";
+
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
-    private String slackNamePattern;
+    private String slackIdPattern;
     private UserDTO fromUser;
     private String text;
     private List<UserDTO> usersInText;
@@ -26,12 +30,9 @@ public class SlackParsedCommand {
         this.fromUser = fromUser;
         this.text = text;
         this.usersInText = usersInText;
-        slackNamePattern = Utils.getProperty(
-                "application.properties",
-                "keepers.slackNamePattern"
-        );
+        slackIdPattern = SLACK_ID_PATTERN;
         logger.debug("SlackParsedCommand created with parameters: " +
-                        "fromSlackName: {} text: {} userCountInText {} users: {}",
+                        "fromSlackId: {} text: {} userCountInText {} users: {}",
                 fromUser, text, usersInText.size(), usersInText.toString());
     }
 
@@ -41,15 +42,15 @@ public class SlackParsedCommand {
 
     public UserDTO getFirstUserFromText() {
         if (usersInText.size() == 0) {
-            logger.warn("The text: '{}' doesn't contain any slack names", text);
-            throw new WrongCommandFormatException(String.format("The text '%s' doesn't contain any slack names", text));
+            logger.warn("The text: '{}' doesn't contain any slack ids", text);
+            throw new WrongCommandFormatException(String.format("The text '%s' doesn't contain any slack ids", text));
         } else {
             return usersInText.get(0);
         }
     }
 
-    public String getTextWithoutSlackNames() {
-        String result = text.replaceAll(slackNamePattern, "");
+    public String getTextWithoutSlackIds() {
+        String result = text.replaceAll(slackIdPattern, "");
         result = result.replaceAll("\\s+", " ").trim();
         return result;
     }
@@ -64,5 +65,9 @@ public class SlackParsedCommand {
 
     public int getUserCountInText() {
         return usersInText.size();
+    }
+
+    public static String wrapSlackId(String slackId){
+        return String.format(SLACK_ID_WRAPPER_PATTERN, slackId);
     }
 }

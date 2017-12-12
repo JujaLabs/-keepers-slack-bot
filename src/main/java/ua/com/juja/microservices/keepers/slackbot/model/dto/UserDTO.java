@@ -8,6 +8,7 @@ import lombok.ToString;
 
 /**
  * @author Nikolay Horushko
+ * @author Oleksii Skachkov
  */
 @Getter
 @AllArgsConstructor
@@ -17,5 +18,5 @@ public class UserDTO {
     @JsonProperty
     private String uuid;
     @JsonProperty
-    private String slack;
+    private String slackId;
 }

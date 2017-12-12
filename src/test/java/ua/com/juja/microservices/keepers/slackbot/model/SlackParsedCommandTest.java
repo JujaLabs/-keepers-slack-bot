@@ -15,6 +15,7 @@ import static org.junit.Assert.*;
 
 /**
  * @author Konstantin Sergey
+ * @author Oleksii Skachkov
  */
 public class SlackParsedCommandTest {
     private List<UserDTO> usersInText;
@@ -25,20 +26,20 @@ public class SlackParsedCommandTest {
 
     @Before
     public void setup() {
-        fromUser = new UserDTO("uuid0", "@from");
+        fromUser = new UserDTO("uuid0", "from-id");
         usersInText = new ArrayList<>();
     }
 
     @Test
     public void getFirstUserInText() {
         //given
-        usersInText.add(new UserDTO("uuid1", "@slack1"));
-        String text = "text text @slack1 text";
+        usersInText.add(new UserDTO("uuid1", "slack-id1"));
+        String text = String.format("text text %s text", SlackParsedCommand.wrapSlackId("slack-id1"));
         SlackParsedCommand slackParsedCommand = new SlackParsedCommand(fromUser, text, usersInText);
         //when
         UserDTO result = slackParsedCommand.getFirstUserFromText();
         //then
-        assertEquals("UserDTO(uuid=uuid1, slack=@slack1)", result.toString());
+        assertEquals("UserDTO(uuid=uuid1, slackId=slack-id1)", result.toString());
     }
 
     @Test
@@ -48,7 +49,7 @@ public class SlackParsedCommandTest {
         SlackParsedCommand slackParsedCommand = new SlackParsedCommand(fromUser, text, usersInText);
         //then
         thrown.expect(WrongCommandFormatException.class);
-        thrown.expectMessage(containsString("The text 'text text text' doesn't contain any slack names"));
+        thrown.expectMessage(containsString("The text 'text text text' doesn't contain any slack ids"));
         //when
         slackParsedCommand.getFirstUserFromText();
     }
@@ -56,16 +57,17 @@ public class SlackParsedCommandTest {
     @Test
     public void getAllUsers() {
         //given
-        usersInText.add(new UserDTO("uuid1", "@slack1"));
-        usersInText.add(new UserDTO("uuid2", "@slack2"));
-        usersInText.add(new UserDTO("uuid3", "@slack3"));
-        String text = "text @slack3 text@slack2 text @slack1";
+        usersInText.add(new UserDTO("uuid1", "slack-id1"));
+        usersInText.add(new UserDTO("uuid2", "slack-id2"));
+        usersInText.add(new UserDTO("uuid3", "slack-id3"));
+        String text = String.format("text %s text %s text %s", SlackParsedCommand.wrapSlackId("slack-id3"),
+                SlackParsedCommand.wrapSlackId("slack-id2"), SlackParsedCommand.wrapSlackId("slack-id1"));
         SlackParsedCommand slackParsedCommand = new SlackParsedCommand(fromUser, text, usersInText);
         //when
         List<UserDTO> result = slackParsedCommand.getAllUsersFromText();
         //then
-        assertEquals("[UserDTO(uuid=uuid1, slack=@slack1), UserDTO(uuid=uuid2, slack=@slack2)," +
-                        " UserDTO(uuid=uuid3, slack=@slack3)]",
+        assertEquals("[UserDTO(uuid=uuid1, slackId=slack-id1), UserDTO(uuid=uuid2, slackId=slack-id2)," +
+                        " UserDTO(uuid=uuid3, slackId=slack-id3)]",
                 result.toString());
     }
 
@@ -88,14 +90,14 @@ public class SlackParsedCommandTest {
         //when
         UserDTO result = slackParsedCommand.getFromUser();
         //then
-        assertEquals("UserDTO(uuid=uuid0, slack=@from)", result.toString());
+        assertEquals("UserDTO(uuid=uuid0, slackId=from-id)", result.toString());
     }
 
     @Test
     public void getUserCount() {
         //given
-        usersInText.add(new UserDTO("uuid1", "@slack1"));
-        String text = "text @slack1 text";
+        usersInText.add(new UserDTO("uuid1", "slack-id1"));
+        String text = String.format("text %s text", SlackParsedCommand.wrapSlackId("slack-id1"));
         //when
         SlackParsedCommand slackParsedCommand = new SlackParsedCommand(fromUser, text, usersInText);
         //then
@@ -103,12 +105,13 @@ public class SlackParsedCommandTest {
     }
 
     @Test
-    public void getTextWithoutSlackNames() {
+    public void getTextWithoutSlackIds() {
         //given
-        String text = "   @slack text  @slack text @slack ";
+        String text = String.format("%s text %s text %s", SlackParsedCommand.wrapSlackId("slack-id"),
+                SlackParsedCommand.wrapSlackId("slack-id"), SlackParsedCommand.wrapSlackId("slack-id"));
         //when
         SlackParsedCommand slackParsedCommand = new SlackParsedCommand(fromUser, text, usersInText);
         //then
-        assertEquals("text text", slackParsedCommand.getTextWithoutSlackNames());
+        assertEquals("text text", slackParsedCommand.getTextWithoutSlackIds());
     }
 }

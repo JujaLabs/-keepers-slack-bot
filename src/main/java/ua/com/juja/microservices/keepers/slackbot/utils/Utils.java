@@ -7,9 +7,10 @@ import java.util.Properties;
 
 /**
  * @author Konstantin Sergey
+ * @author Oleksii Skachkov
  */
 public class Utils {
-    public static String getProperty(String propertyFile, String propertyName) {
+    public static String getProperty(String propertyFile, String propertyId) {
         Properties properties = new Properties();
         ClassLoader loader = SlackParsedCommand.class.getClassLoader();
         try {
@@ -17,6 +18,6 @@ public class Utils {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return properties.getProperty(propertyName);
+        return properties.getProperty(propertyId);
     }
 }

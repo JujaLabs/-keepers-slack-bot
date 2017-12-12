@@ -12,6 +12,7 @@ import java.util.List;
 
 /**
  * @author Nikolay Horushko
+ * @author Oleksii Skachkov
  */
 @Service
 public class DefaultUserService implements UserService {
@@ -24,10 +25,10 @@ public class DefaultUserService implements UserService {
     }
 
     @Override
-    public List<UserDTO> findUsersBySlackNames(List<String> slackNames) {
-        logger.debug("Received SlackName: [{}] for conversion", slackNames.toString());
-        List<UserDTO> users = userRepository.findUsersBySlackNames(slackNames);
-        logger.info("Found users: [{}] by SlackName: [{}]", users.toString(), slackNames.toString());
+    public List<UserDTO> findUsersBySlackIds(List<String> slackIds) {
+        logger.debug("Received SlackId: [{}] for conversion", slackIds.toString());
+        List<UserDTO> users = userRepository.findUsersBySlackIds(slackIds);
+        logger.info("Found users: [{}] by SlackId: [{}]", users.toString(), slackIds.toString());
         return users;
     }
 }
