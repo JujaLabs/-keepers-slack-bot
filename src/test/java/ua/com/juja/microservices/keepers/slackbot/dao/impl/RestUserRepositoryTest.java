@@ -46,7 +46,7 @@ public class RestUserRepositoryTest {
     private String urlBaseUsers;
     @Value("${users.rest.api.version}")
     private String version;
-    @Value("${users.endpoint.usersBySlackIds}")
+    @Value("${users.endpoint.usersBySlackUsers}")
     private String urlGetUsers;
 
     @Rule
@@ -58,22 +58,24 @@ public class RestUserRepositoryTest {
     }
 
     @Test
-    public void shouldReturnListUserDTOWhenSendSlackIdList() {
+    public void shouldReturnListUserDTOWhenSendSlackUsersList() {
         //given
-        List<String> slackIds = new ArrayList<>();
-        slackIds.add("bob.slack-id");
-        slackIds.add("john.slack-id");
+        List<String> slackUsers = new ArrayList<>();
+        slackUsers.add("slack1");
+        slackUsers.add("slack2");
         mockServer.expect(requestTo(urlBaseUsers + version + urlGetUsers))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().contentType(APPLICATION_JSON_UTF8))
-                .andExpect(content().string("{\"slackIds\":[\"bob.slack-id\",\"john.slack-id\"]}"))
-                .andRespond(withSuccess("[{\"uuid\":\"AAAA123\",\"slackId\":\"bob.slack-id\"}, " +
-                        "{\"uuid\":\"AAAA321\",\"slackId\":\"john.slack-id\"}]", MediaType.APPLICATION_JSON_UTF8));
+                .andExpect(content().string("{\"slackIds\":[\"slack1\",\"slack2\"]}"))
+                .andRespond(withSuccess("[{\"uuid\":\"AAAA123\",\"slackId\":\"slack1\"}, " +
+                        "{\"uuid\":\"AAAA321\",\"slackId\":\"slack2\"}]", MediaType.APPLICATION_JSON_UTF8));
+
         //when
-        List<UserDTO> result = userRepository.findUsersBySlackIds(slackIds);
+        List<UserDTO> result = userRepository.findUsersBySlackUsers(slackUsers);
+
         // then
         mockServer.verify();
-        assertEquals("[UserDTO(uuid=AAAA123, slackId=bob.slack-id), UserDTO(uuid=AAAA321, slackId=john.slack-id)]",
+        assertEquals("[UserDTO(uuid=AAAA123, slackUser=slack1), UserDTO(uuid=AAAA321, slackUser=slack2)]",
                 result.toString());
     }
 }
