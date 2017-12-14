@@ -26,7 +26,6 @@ import java.util.List;
  * @author Oleksii Skachkov
  */
 @Repository
-@Profile({"production", "default"})
 public class RestUserRepository extends AbstractRestRepository implements UserRepository {
 
     private final RestTemplate restTemplate;
