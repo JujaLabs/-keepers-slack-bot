@@ -25,10 +25,10 @@ public class DefaultUserService implements UserService {
     }
 
     @Override
-    public List<UserDTO> findUsersBySlackIds(List<String> slackIds) {
-        logger.debug("Received SlackId: [{}] for conversion", slackIds.toString());
-        List<UserDTO> users = userRepository.findUsersBySlackIds(slackIds);
-        logger.info("Found users: [{}] by SlackId: [{}]", users.toString(), slackIds.toString());
+    public List<UserDTO> findUsersBySlackUsers(List<String> slackUsers) {
+        logger.debug("Received SlackUsers: [{}] for conversion", slackUsers.toString());
+        List<UserDTO> users = userRepository.findUsersBySlackUsers(slackUsers);
+        logger.info("Found users: [{}] by SlackUsers: [{}]", users.toString(), slackUsers.toString());
         return users;
     }
 }

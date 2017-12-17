@@ -7,11 +7,11 @@ package ua.com.juja.microservices.keepers.slackbot.service;
  * @author Oleksii Skachkov
  */
 public interface KeeperService {
-    String sendKeeperAddRequest(String fromUserId, String text);
+    String sendKeeperAddRequest(String fromSlackUser, String text);
 
-    String sendKeeperDeactivateRequest(String fromUserId, String text);
+    String sendKeeperDeactivateRequest(String fromSlackUser, String text);
 
-    String getKeeperDirections(String fromUserId, String text);
+    String getKeeperDirections(String fromSlackUser, String text);
 
-    String getMyDirections(String fromUserId);
+    String getMyDirections(String fromSlackUser);
 }

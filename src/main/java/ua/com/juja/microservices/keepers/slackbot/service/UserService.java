@@ -9,5 +9,5 @@ import java.util.List;
  * @author OleksiiSkachkov
  */
 public interface UserService {
-    List<UserDTO> findUsersBySlackIds(List<String> slackIds);
+    List<UserDTO> findUsersBySlackUsers(List<String> slackUsers);
 }

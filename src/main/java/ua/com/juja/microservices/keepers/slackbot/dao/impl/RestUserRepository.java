@@ -3,6 +3,7 @@ package ua.com.juja.microservices.keepers.slackbot.dao.impl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -12,7 +13,7 @@ import org.springframework.web.client.RestTemplate;
 import ua.com.juja.microservices.keepers.slackbot.dao.UserRepository;
 import ua.com.juja.microservices.keepers.slackbot.exception.ApiError;
 import ua.com.juja.microservices.keepers.slackbot.exception.UserExchangeException;
-import ua.com.juja.microservices.keepers.slackbot.model.dto.SlackIdRequest;
+import ua.com.juja.microservices.keepers.slackbot.model.dto.SlackUserRequest;
 import ua.com.juja.microservices.keepers.slackbot.model.dto.UserDTO;
 
 import javax.inject.Inject;
@@ -34,7 +35,7 @@ public class RestUserRepository extends AbstractRestRepository implements UserRe
     private String urlBase;
     @Value("${users.rest.api.version}")
     private String version;
-    @Value("${users.endpoint.usersBySlackIds}")
+    @Value("${users.endpoint.usersBySlackUsers}")
     private String urlGetUsers;
 
     @Inject
@@ -43,11 +44,11 @@ public class RestUserRepository extends AbstractRestRepository implements UserRe
     }
 
     @Override
-    public List<UserDTO> findUsersBySlackIds(List<String> slackIds) {
-        logger.debug("Received SlackIds : [{}]", slackIds);
+    public List<UserDTO> findUsersBySlackUsers(List<String> slackUsers) {
+        logger.debug("Received SlackUsers : [{}]", slackUsers);
 
-        SlackIdRequest slackIdRequest = new SlackIdRequest(slackIds);
-        HttpEntity<SlackIdRequest> request = new HttpEntity<>(slackIdRequest, setupBaseHttpHeaders());
+        SlackUserRequest slackUserRequest = new SlackUserRequest(slackUsers);
+        HttpEntity<SlackUserRequest> request = new HttpEntity<>(slackUserRequest, setupBaseHttpHeaders());
 
         List<UserDTO> result;
         try {
@@ -62,7 +63,7 @@ public class RestUserRepository extends AbstractRestRepository implements UserRe
             throw new UserExchangeException(error, ex);
         }
 
-        logger.info("Got UserDTO:{} by users: {}", result, slackIds);
+        logger.info("Got UserDTO:{} by users: {}", result, slackUsers);
         return result;
     }
 }
