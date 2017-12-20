@@ -18,24 +18,25 @@ import java.util.Arrays;
  * @author Dmitriy Lyashenko
  * @author Konstantin Sergey
  * @author Ivan Shapovalov
+ * @author Oleksii Skachkov
  */
 @Service
 public class DefaultKeeperService implements KeeperService {
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
     private KeeperRepository keeperRepository;
-    private SlackNameHandlerService slackNameHandlerService;
+    private SlackUserHandlerService slackUserHandlerService;
 
     @Inject
-    public DefaultKeeperService(KeeperRepository keeperRepository, SlackNameHandlerService slackNameHandlerService) {
+    public DefaultKeeperService(KeeperRepository keeperRepository, SlackUserHandlerService slackUserHandlerService) {
         this.keeperRepository = keeperRepository;
-        this.slackNameHandlerService = slackNameHandlerService;
+        this.slackUserHandlerService = slackUserHandlerService;
     }
 
     @Override
-    public String sendKeeperAddRequest(String fromUser, String text) {
+    public String sendKeeperAddRequest(String fromSlackUser, String text) {
         logger.debug("Started create slackParsedCommand and create keeper request");
-        SlackParsedCommand slackParsedCommand = slackNameHandlerService.createSlackParsedCommand(fromUser, text);
+        SlackParsedCommand slackParsedCommand = slackUserHandlerService.createSlackParsedCommand(fromSlackUser, text);
         KeeperRequest keeperRequest = new KeeperRequest(slackParsedCommand.getFromUser().getUuid(),
                 receiveToUser(slackParsedCommand).getUuid(),
                 receiveToDirections(slackParsedCommand));
@@ -48,7 +49,8 @@ public class DefaultKeeperService implements KeeperService {
 
         if (ids.length > 0) {
             result = String.format("Thanks, we added a new Keeper: %s in direction: %s",
-                    slackParsedCommand.getFirstUserFromText().getSlack(), keeperRequest.getDirection());
+                    SlackParsedCommand.wrapSlackUserInFullPattern(slackParsedCommand.getFirstUserFromText().getSlackUser()),
+                    keeperRequest.getDirection());
         } else {
             result = "ERROR. Something went wrong. Keeper was not added :(";
         }
@@ -56,9 +58,9 @@ public class DefaultKeeperService implements KeeperService {
     }
 
     @Override
-    public String sendKeeperDeactivateRequest(String fromUser, String text) {
+    public String sendKeeperDeactivateRequest(String fromSlackUser, String text) {
         logger.debug("Started create slackParsedCommand and create keeper request");
-        SlackParsedCommand slackParsedCommand = slackNameHandlerService.createSlackParsedCommand(fromUser, text);
+        SlackParsedCommand slackParsedCommand = slackUserHandlerService.createSlackParsedCommand(fromSlackUser, text);
         KeeperRequest keeperRequest = new KeeperRequest(slackParsedCommand.getFromUser().getUuid(),
                 receiveToUser(slackParsedCommand).getUuid(),
                 receiveToDirections(slackParsedCommand));
@@ -71,7 +73,8 @@ public class DefaultKeeperService implements KeeperService {
 
         if (ids.length > 0) {
             result = String.format("Keeper: %s in direction: %s deactivated",
-                    slackParsedCommand.getFirstUserFromText().getSlack(), keeperRequest.getDirection());
+                    SlackParsedCommand.wrapSlackUserInFullPattern(slackParsedCommand.getFirstUserFromText().getSlackUser()),
+                    keeperRequest.getDirection());
         } else {
             result = "ERROR. Something went wrong. Keeper was not deactivated :(";
         }
@@ -79,40 +82,42 @@ public class DefaultKeeperService implements KeeperService {
     }
 
     @Override
-    public String getKeeperDirections(String fromUser, String text) {
+    public String getKeeperDirections(String fromSlackUser, String text) {
         logger.debug("Started create slackParsedCommand and create keeper request");
-        SlackParsedCommand slackParsedCommand = slackNameHandlerService.createSlackParsedCommand(fromUser, text);
+        SlackParsedCommand slackParsedCommand = slackUserHandlerService.createSlackParsedCommand(fromSlackUser, text);
         if (slackParsedCommand.getFromUser().equals(slackParsedCommand.getFirstUserFromText())) {
-            throw new WrongCommandFormatException("Your own slackname in command. To get your " +
+            throw new WrongCommandFormatException("Your own slack in command. To get your " +
                     "own directions use another command");
         }
         KeeperRequest keeperRequest = new KeeperRequest(slackParsedCommand.getFromUser().getUuid(),
                 slackParsedCommand.getFirstUserFromText().getUuid(),
-                slackParsedCommand.getTextWithoutSlackNames());
+                slackParsedCommand.getTextWithoutSlackUsers());
 
-        return getKeeperDirectionsFromRepository(keeperRequest, slackParsedCommand.getFirstUserFromText().getSlack());
+        return getKeeperDirectionsFromRepository(keeperRequest, slackParsedCommand.getFirstUserFromText().getSlackUser());
     }
 
     @Override
-    public String getMyDirections(String fromUser) {
+    public String getMyDirections(String fromSlackUser) {
         logger.debug("Started create slackParsedCommand and create keeper request");
-        SlackParsedCommand slackParsedCommand = slackNameHandlerService.createSlackParsedCommand(fromUser, "");
+        SlackParsedCommand slackParsedCommand = slackUserHandlerService.createSlackParsedCommand(fromSlackUser, "");
         KeeperRequest keeperRequest = new KeeperRequest(slackParsedCommand.getFromUser().getUuid(),
                 slackParsedCommand.getFromUser().getUuid(),
-                slackParsedCommand.getTextWithoutSlackNames());
+                slackParsedCommand.getTextWithoutSlackUsers());
 
-        return getKeeperDirectionsFromRepository(keeperRequest, slackParsedCommand.getFirstUserFromText().getSlack());
+        return getKeeperDirectionsFromRepository(keeperRequest, slackParsedCommand.getFirstUserFromText().getSlackUser());
     }
 
-    private String getKeeperDirectionsFromRepository(KeeperRequest keeperRequest, String keeperSlackName) {
+    private String getKeeperDirectionsFromRepository(KeeperRequest keeperRequest, String keeperSlackUser) {
         logger.debug("Received request to get directions of keeper with uuid: [{}]", keeperRequest.toString());
         String[] directions = keeperRepository.getKeeperDirections(keeperRequest);
         logger.info("Received response from keeperRepository: [{}]", Arrays.toString(directions));
 
-        String responseMessage = "The keeper " + keeperSlackName + " has no active directions.";
+        String responseMessage = "The keeper " + SlackParsedCommand.wrapSlackUserInFullPattern(keeperSlackUser) +
+                " has no active directions.";
 
         if (directions.length > 0) {
-            responseMessage = "The keeper " + keeperSlackName + " has active directions: " + Arrays.toString(directions);
+            responseMessage = "The keeper " + SlackParsedCommand.wrapSlackUserInFullPattern(keeperSlackUser) +
+                    " has active directions: " + Arrays.toString(directions);
         }
         return responseMessage;
     }
@@ -122,14 +127,15 @@ public class DefaultKeeperService implements KeeperService {
         int userCount = slackParsedCommand.getUserCountInText();
 
         if (userCount > 1) {
-            throw new WrongCommandFormatException(String.format("We found %d slack names in your command: '%s' " +
-                            "You can not perform actions with several slack names.",
+            throw new WrongCommandFormatException(String.format("We found %d slack users in your command '%s'. " +
+                            "You can not perform actions with several slack users.",
                     slackParsedCommand.getUserCountInText(), slackParsedCommand.getText()));
         }
 
         if (userCount == 0) {
-            throw new WrongCommandFormatException(String.format("We didn't find any slack name in your command. '%s' " +
-                    "You must write the user's slack name to perform the action with keepers.", slackParsedCommand.getText()));
+            throw new WrongCommandFormatException(String.format("We didn't find any slack user in your command '%s'. " +
+                            "You must write the user's slack to perform the action with keepers.",
+                    slackParsedCommand.getText()));
         }
 
         return slackParsedCommand.getFirstUserFromText();
@@ -137,18 +143,18 @@ public class DefaultKeeperService implements KeeperService {
 
     private String receiveToDirections(SlackParsedCommand parsedCommand) {
 
-        String textWithoutSlackNames = parsedCommand.getTextWithoutSlackNames();
+        String textWithoutSlackUsers = parsedCommand.getTextWithoutSlackUsers();
 
-        if (textWithoutSlackNames.length() == 0) {
-            throw new WrongCommandFormatException(String.format("We didn't find direction in your command: '%s' " +
+        if (textWithoutSlackUsers.length() == 0) {
+            throw new WrongCommandFormatException(String.format("We didn't find direction in your command '%s'. " +
                     "You must write the direction to perform the action with keepers.", parsedCommand.getText()));
         }
 
-        if (textWithoutSlackNames.split(" ").length > 1) {
-            throw new WrongCommandFormatException(String.format("We found several directions in your command: '%s' " +
-                    "You can perform the action with keepers on one direction only.", parsedCommand.getTextWithoutSlackNames()));
+        if (textWithoutSlackUsers.split(" ").length > 1) {
+            throw new WrongCommandFormatException(String.format("We found several directions in your command '%s'. " +
+                    "You can perform the action with keepers on one direction only.", parsedCommand.getTextWithoutSlackUsers()));
         }
 
-        return parsedCommand.getTextWithoutSlackNames();
+        return parsedCommand.getTextWithoutSlackUsers();
     }
 }

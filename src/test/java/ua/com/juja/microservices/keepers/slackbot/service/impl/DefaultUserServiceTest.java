@@ -15,9 +15,12 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 /**
  * @author Nikolay Horushko
+ * @author Oleksii Skachkov
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest
@@ -30,15 +33,19 @@ public class DefaultUserServiceTest {
     private UserRepository userRepository;
 
     @Test
-    public void returnUsersListBySlacks() throws Exception {
+    public void returnUsersListBySlackUsers() throws Exception {
         //given
-        List<String> slackNamesRequest = Arrays.asList("@slack1", "@slack2");
-        List<UserDTO> usersResponse = Arrays.asList(new UserDTO("uuid1", "@slack1"),
+        List<String> slackUsersRequest = Arrays.asList("slack1", "slack2");
+        List<UserDTO> expected = Arrays.asList(new UserDTO("uuid1", "slack1"),
                 new UserDTO("uuid2", "slack2"));
-        given(userRepository.findUsersBySlackNames(slackNamesRequest)).willReturn(usersResponse);
+        given(userRepository.findUsersBySlackUsers(slackUsersRequest)).willReturn(expected);
+
         //when
-        List<UserDTO> result = userService.findUsersBySlackNames(slackNamesRequest);
+        List<UserDTO> actual = userService.findUsersBySlackUsers(slackUsersRequest);
+
         //then
-        assertEquals("[UserDTO(uuid=uuid1, slack=@slack1), UserDTO(uuid=uuid2, slack=slack2)]", result.toString());
+        assertEquals(expected, actual);
+        verify(userRepository).findUsersBySlackUsers(slackUsersRequest);
+        verifyNoMoreInteractions(userRepository);
     }
 }

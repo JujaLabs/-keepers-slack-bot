@@ -7,7 +7,6 @@ import org.springframework.web.client.HttpClientErrorException;
 import ua.com.juja.microservices.keepers.slackbot.exception.ApiError;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
 
 /**

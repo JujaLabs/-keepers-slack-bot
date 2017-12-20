@@ -6,7 +6,8 @@ import java.util.List;
 
 /**
  * @author Nikolay Horushko
+ * @author Oleksii Skachkov
  */
 public interface UserRepository {
-    List<UserDTO> findUsersBySlackNames(List<String> slackNames);
+    List<UserDTO> findUsersBySlackUsers(List<String> slackUsers);
 }

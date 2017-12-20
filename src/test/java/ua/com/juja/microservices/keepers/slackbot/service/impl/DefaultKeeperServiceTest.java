@@ -30,17 +30,19 @@ import static org.mockito.Mockito.when;
  * @author Nikolay Horushko
  * @author Dmitriy Lyashenko
  * @author Ivan Shapovalov
+ * @author Oleksii Skachkov
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest
 public class DefaultKeeperServiceTest {
     @Rule
     public ExpectedException thrown = ExpectedException.none();
-    UserDTO fromUser;
+    private UserDTO userFrom;
+    private UserDTO user1;
     @MockBean
     private KeeperRepository keeperRepository;
     @MockBean
-    private SlackNameHandlerService slackNameHandlerService;
+    private SlackUserHandlerService slackUserHandlerService;
     @Inject
     private KeeperService keeperService;
     private List<UserDTO> usersInText;
@@ -48,203 +50,222 @@ public class DefaultKeeperServiceTest {
     @Before
     public void setup() {
         MockitoAnnotations.initMocks(this);
-        fromUser = new UserDTO("uuid0", "@from");
+        userFrom = new UserDTO("uuid-from", "slack-from");
+        user1 = new UserDTO("uuid1", "slack1");
         usersInText = new ArrayList<>();
-        usersInText.add(new UserDTO("uuid1", "@slack_name"));
     }
 
     @Test
     public void shouldSaveKeeperAndReturnValidText() {
         //given
+        usersInText.add(user1);
         String[] expectedKeeperId = {"100"};
-        final String KEEPER_ADD_COMMAND_TEXT = "@slack_name teams";
-        KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid1", "teams");
+        final String keeperAddCommandText = String.format("%s teams", SlackParsedCommand.wrapSlackUserInFullPattern(user1.getSlackUser()));
+        KeeperRequest keeperRequest = new KeeperRequest(userFrom.getUuid(), user1.getUuid(), "teams");
         when(keeperRepository.addKeeper(keeperRequest)).thenReturn(expectedKeeperId);
-        when(slackNameHandlerService.createSlackParsedCommand("@from", KEEPER_ADD_COMMAND_TEXT))
-                .thenReturn(new SlackParsedCommand(fromUser, KEEPER_ADD_COMMAND_TEXT, usersInText));
+        when(slackUserHandlerService.createSlackParsedCommand(userFrom.getSlackUser(), keeperAddCommandText))
+                .thenReturn(new SlackParsedCommand(userFrom, keeperAddCommandText, usersInText));
+        String expected = String.format("Thanks, we added a new Keeper: %s in direction: teams",
+                SlackParsedCommand.wrapSlackUserInFullPattern(user1.getSlackUser()));
 
         //when
-        String result = keeperService.sendKeeperAddRequest("@from", KEEPER_ADD_COMMAND_TEXT);
+        String actual = keeperService.sendKeeperAddRequest(userFrom.getSlackUser(), keeperAddCommandText);
 
         //then
-        assertEquals("Thanks, we added a new Keeper: @slack_name in direction: teams", result);
+        assertEquals(expected, actual);
         verify(keeperRepository).addKeeper(keeperRequest);
-        verify(slackNameHandlerService).createSlackParsedCommand("@from", KEEPER_ADD_COMMAND_TEXT);
+        verify(slackUserHandlerService).createSlackParsedCommand(userFrom.getSlackUser(), keeperAddCommandText);
     }
 
     @Test
     public void keeperAddShouldReturnERRORText() {
         //given
+        usersInText.add(user1);
         String[] expectedEmptyArray = {};
-        final String KEEPER_ADD_COMMAND_TEXT = "@slack_name teams";
-        KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid1", "teams");
+        final String KEEPER_ADD_COMkeeperAddCommandTextAND_TEXT =
+                String.format("%s teams", SlackParsedCommand.wrapSlackUserInFullPattern(user1.getSlackUser()));
+        KeeperRequest keeperRequest = new KeeperRequest(userFrom.getUuid(), user1.getUuid(), "teams");
         when(keeperRepository.addKeeper(keeperRequest)).thenReturn(expectedEmptyArray);
-        when(slackNameHandlerService.createSlackParsedCommand("@from", KEEPER_ADD_COMMAND_TEXT))
-                .thenReturn(new SlackParsedCommand(fromUser, KEEPER_ADD_COMMAND_TEXT, usersInText));
+        when(slackUserHandlerService.createSlackParsedCommand(userFrom.getSlackUser(), KEEPER_ADD_COMkeeperAddCommandTextAND_TEXT))
+                .thenReturn(new SlackParsedCommand(userFrom, KEEPER_ADD_COMkeeperAddCommandTextAND_TEXT, usersInText));
 
         //when
-        String result = keeperService.sendKeeperAddRequest("@from", KEEPER_ADD_COMMAND_TEXT);
+        String actual = keeperService.sendKeeperAddRequest(userFrom.getSlackUser(), KEEPER_ADD_COMkeeperAddCommandTextAND_TEXT);
 
         //then
-        assertEquals("ERROR. Something went wrong. Keeper was not added :(", result);
+        assertEquals("ERROR. Something went wrong. Keeper was not added :(", actual);
         verify(keeperRepository).addKeeper(keeperRequest);
-        verify(slackNameHandlerService).createSlackParsedCommand("@from", KEEPER_ADD_COMMAND_TEXT);
+        verify(slackUserHandlerService).createSlackParsedCommand(userFrom.getSlackUser(),
+                KEEPER_ADD_COMkeeperAddCommandTextAND_TEXT);
     }
 
     @Test
-    public void keeperAddWhenZeroUsersInTextShouldReturnERRORText() {
+    public void keeperAddWhenZeroUsersInTextShouldReturnErrorText() {
         //given
-        usersInText.clear();
-        final String KEEPER_ADD_COMMAND_TEXT = "teams";
-        when(slackNameHandlerService.createSlackParsedCommand("@from", KEEPER_ADD_COMMAND_TEXT))
-                .thenReturn(new SlackParsedCommand(fromUser, KEEPER_ADD_COMMAND_TEXT, usersInText));
+        final String keeperAddCommandText = "teams";
+        when(slackUserHandlerService.createSlackParsedCommand(userFrom.getSlackUser(), keeperAddCommandText))
+                .thenReturn(new SlackParsedCommand(userFrom, keeperAddCommandText, usersInText));
 
         thrown.expect(WrongCommandFormatException.class);
-        thrown.expectMessage(containsString("We didn't find any slack name in your command. " +
-                "'teams' You must write the user's slack name to perform the action with keepers."));
+        thrown.expectMessage(containsString("We didn't find any slack user in your command 'teams'. " +
+                "You must write the user's slack to perform the action with keepers."));
 
         //when
-        keeperService.sendKeeperAddRequest("@from", KEEPER_ADD_COMMAND_TEXT);
+        keeperService.sendKeeperAddRequest(userFrom.getSlackUser(), keeperAddCommandText);
 
         //then
-        verify(slackNameHandlerService).createSlackParsedCommand("@from", KEEPER_ADD_COMMAND_TEXT);
+        verify(slackUserHandlerService).createSlackParsedCommand(userFrom.getSlackUser(), keeperAddCommandText);
     }
 
     @Test
     public void shouldDeactivateKeeperAndReturnValidText() {
         //given
+        usersInText.add(user1);
         String[] expectedKeeperId = {"100"};
-        final String KEEPER_DEACTIVATE_COMMAND_TEXT = "@slack_name teams";
-        KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid1", "teams");
+        final String keeperDeactivateCommandText = String.format("%s teams",
+                SlackParsedCommand.wrapSlackUserInFullPattern(user1.getSlackUser()));
+        KeeperRequest keeperRequest = new KeeperRequest(userFrom.getUuid(), user1.getUuid(), "teams");
         when(keeperRepository.deactivateKeeper(keeperRequest)).thenReturn(expectedKeeperId);
-        when(slackNameHandlerService.createSlackParsedCommand("@from", KEEPER_DEACTIVATE_COMMAND_TEXT))
-                .thenReturn(new SlackParsedCommand(fromUser, KEEPER_DEACTIVATE_COMMAND_TEXT, usersInText));
+        when(slackUserHandlerService.createSlackParsedCommand(userFrom.getSlackUser(), keeperDeactivateCommandText))
+                .thenReturn(new SlackParsedCommand(userFrom, keeperDeactivateCommandText, usersInText));
+        String expected = String.format("Keeper: %s in direction: teams deactivated",
+                SlackParsedCommand.wrapSlackUserInFullPattern(user1.getSlackUser()));
 
         //when
-        String result = keeperService.sendKeeperDeactivateRequest("@from", KEEPER_DEACTIVATE_COMMAND_TEXT);
+        String actual = keeperService.sendKeeperDeactivateRequest(userFrom.getSlackUser(), keeperDeactivateCommandText);
 
         //then
-        assertEquals("Keeper: @slack_name in direction: teams deactivated", result);
+        assertEquals(expected, actual);
         verify(keeperRepository).deactivateKeeper(keeperRequest);
-        verify(slackNameHandlerService).createSlackParsedCommand("@from", KEEPER_DEACTIVATE_COMMAND_TEXT);
+        verify(slackUserHandlerService).createSlackParsedCommand(userFrom.getSlackUser(), keeperDeactivateCommandText);
     }
 
     @Test
     public void keeperDeactivateShouldReturnERRORText() {
         //given
+        usersInText.add(user1);
         String[] expectedEmptyArray = {};
-        final String KEEPER_DEACTIVATE_COMMAND_TEXT = "@slack_name teams";
-        KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid1", "teams");
+        final String keeperDeactivateCommandText = String.format("%s teams",
+                SlackParsedCommand.wrapSlackUserInFullPattern(user1.getSlackUser()));
+        KeeperRequest keeperRequest = new KeeperRequest(userFrom.getUuid(), user1.getUuid(), "teams");
         when(keeperRepository.deactivateKeeper(keeperRequest)).thenReturn(expectedEmptyArray);
-        when(slackNameHandlerService.createSlackParsedCommand("@from", KEEPER_DEACTIVATE_COMMAND_TEXT))
-                .thenReturn(new SlackParsedCommand(fromUser, KEEPER_DEACTIVATE_COMMAND_TEXT, usersInText));
+        when(slackUserHandlerService.createSlackParsedCommand(userFrom.getSlackUser(), keeperDeactivateCommandText))
+                .thenReturn(new SlackParsedCommand(userFrom, keeperDeactivateCommandText, usersInText));
 
         //when
-        String result = keeperService.sendKeeperDeactivateRequest("@from", KEEPER_DEACTIVATE_COMMAND_TEXT);
+        String actual = keeperService.sendKeeperDeactivateRequest(userFrom.getSlackUser(), keeperDeactivateCommandText);
 
         //then
-        assertEquals("ERROR. Something went wrong. Keeper was not deactivated :(", result);
+        assertEquals("ERROR. Something went wrong. Keeper was not deactivated :(", actual);
         verify(keeperRepository).deactivateKeeper(keeperRequest);
-        verify(slackNameHandlerService).createSlackParsedCommand("@from", KEEPER_DEACTIVATE_COMMAND_TEXT);
+        verify(slackUserHandlerService).createSlackParsedCommand(userFrom.getSlackUser(), keeperDeactivateCommandText);
     }
 
     @Test
     public void getKeeperDirections() {
         //Given
-        String[] expected = {"direction1"};
-        final String GET_KEEPER_DIRECTIONS_COMMAND_TEXT = "@slack_name";
-        KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid1", "");
-        when(keeperRepository.getKeeperDirections(keeperRequest)).thenReturn(expected);
-        when(slackNameHandlerService.createSlackParsedCommand("@from", GET_KEEPER_DIRECTIONS_COMMAND_TEXT))
-                .thenReturn(new SlackParsedCommand(fromUser, GET_KEEPER_DIRECTIONS_COMMAND_TEXT, usersInText));
-
+        usersInText.add(user1);
+        String[] directions = {"direction1"};
+        final String getKeeperDirectionsCommandText = SlackParsedCommand.wrapSlackUserInFullPattern(user1.getSlackUser());
+        KeeperRequest keeperRequest = new KeeperRequest(userFrom.getUuid(), user1.getUuid(), "");
+        when(keeperRepository.getKeeperDirections(keeperRequest)).thenReturn(directions);
+        when(slackUserHandlerService.createSlackParsedCommand(userFrom.getSlackUser(), getKeeperDirectionsCommandText))
+                .thenReturn(new SlackParsedCommand(userFrom, getKeeperDirectionsCommandText, usersInText));
+        String expected = String.format("The keeper %s has active directions: [direction1]",
+                SlackParsedCommand.wrapSlackUserInFullPattern(user1.getSlackUser()));
         //When
-        String result = keeperService.getKeeperDirections("@from", GET_KEEPER_DIRECTIONS_COMMAND_TEXT);
+        String actual = keeperService.getKeeperDirections(userFrom.getSlackUser(), getKeeperDirectionsCommandText);
 
         //Then
-        assertEquals("The keeper @slack_name has active directions: [direction1]", result);
+        assertEquals(expected, actual);
         verify(keeperRepository).getKeeperDirections(keeperRequest);
-        verify(slackNameHandlerService).createSlackParsedCommand("@from", GET_KEEPER_DIRECTIONS_COMMAND_TEXT);
+        verify(slackUserHandlerService).createSlackParsedCommand(userFrom.getSlackUser(), getKeeperDirectionsCommandText);
     }
 
     @Test
     public void getKeeperDirectionsWhenFromUserInTextShouldThrowException() {
         //Given
-        usersInText.clear();
-        usersInText.add(new UserDTO("uuid0", "@from"));
-        final String GET_KEEPER_DIRECTIONS_COMMAND_TEXT = "@from";
-        when(slackNameHandlerService.createSlackParsedCommand("@from", GET_KEEPER_DIRECTIONS_COMMAND_TEXT))
-                .thenReturn(new SlackParsedCommand(fromUser, GET_KEEPER_DIRECTIONS_COMMAND_TEXT, usersInText));
+        usersInText.add(userFrom);
+        final String getKeeperDirectionsCommandText = String.format("%s",
+                SlackParsedCommand.wrapSlackUserInFullPattern(userFrom.getSlackUser()));
+        when(slackUserHandlerService.createSlackParsedCommand(userFrom.getSlackUser(), getKeeperDirectionsCommandText))
+                .thenReturn(new SlackParsedCommand(userFrom, getKeeperDirectionsCommandText, usersInText));
 
         thrown.expect(WrongCommandFormatException.class);
         thrown.expectMessage(
-                containsString("Your own slackname in command. To get your own directions use another command"));
+                containsString("Your own slack in command. To get your own directions use another command"));
 
         //When
-        keeperService.getKeeperDirections("@from", GET_KEEPER_DIRECTIONS_COMMAND_TEXT);
+        keeperService.getKeeperDirections(userFrom.getSlackUser(), getKeeperDirectionsCommandText);
 
         //Then
-        verify(slackNameHandlerService).createSlackParsedCommand("@from", GET_KEEPER_DIRECTIONS_COMMAND_TEXT);
-        verifyNoMoreInteractions(slackNameHandlerService, keeperRepository);
+        verify(slackUserHandlerService).createSlackParsedCommand(userFrom.getSlackUser(), getKeeperDirectionsCommandText);
+        verifyNoMoreInteractions(slackUserHandlerService, keeperRepository);
     }
 
     @Test
     public void getKeeperDirectionsWithEmptyResult() {
         //Given
+        usersInText.add(user1);
         String[] emptyArray = {};
-        final String GET_KEEPER_DIRECTIONS_COMMAND_TEXT = "@slack_name";
-        KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid1", "");
+        final String getKeeperDirectionsCommandText = String.format("%s",
+                SlackParsedCommand.wrapSlackUserInFullPattern(user1.getSlackUser()));
+        KeeperRequest keeperRequest = new KeeperRequest(userFrom.getUuid(), user1.getUuid(), "");
         when(keeperRepository.getKeeperDirections(keeperRequest)).thenReturn(emptyArray);
-        when(slackNameHandlerService.createSlackParsedCommand("@from", GET_KEEPER_DIRECTIONS_COMMAND_TEXT))
-                .thenReturn(new SlackParsedCommand(fromUser, GET_KEEPER_DIRECTIONS_COMMAND_TEXT, usersInText));
-
+        when(slackUserHandlerService.createSlackParsedCommand(userFrom.getSlackUser(), getKeeperDirectionsCommandText))
+                .thenReturn(new SlackParsedCommand(userFrom, getKeeperDirectionsCommandText, usersInText));
+        String expected = String.format("The keeper %s has no active directions.",
+                SlackParsedCommand.wrapSlackUserInFullPattern(user1.getSlackUser()));
         //When
-        String result = keeperService.getKeeperDirections("@from", GET_KEEPER_DIRECTIONS_COMMAND_TEXT);
+        String actual = keeperService.getKeeperDirections(userFrom.getSlackUser(), getKeeperDirectionsCommandText);
 
         //Then
-        assertEquals("The keeper @slack_name has no active directions.", result);
+        assertEquals(expected, actual);
         verify(keeperRepository).getKeeperDirections(keeperRequest);
-        verify(slackNameHandlerService).createSlackParsedCommand("@from", GET_KEEPER_DIRECTIONS_COMMAND_TEXT);
+        verify(slackUserHandlerService).createSlackParsedCommand(userFrom.getSlackUser(), getKeeperDirectionsCommandText);
     }
 
     @Test
     public void getMyDirectionsShouldReturnValidText() {
         //Given
-        usersInText.clear();
-        usersInText.add(new UserDTO("uuid", "@from"));
-        String[] expected = {"direction1"};
-        KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid0", "");
-        when(keeperRepository.getKeeperDirections(keeperRequest)).thenReturn(expected);
-        when(slackNameHandlerService.createSlackParsedCommand("@from", ""))
-                .thenReturn(new SlackParsedCommand(fromUser, "", usersInText));
+        usersInText.add(userFrom);
+        String[] directions = {"direction1"};
+        KeeperRequest keeperRequest = new KeeperRequest(userFrom.getUuid(), userFrom.getUuid(), "");
+        when(keeperRepository.getKeeperDirections(keeperRequest)).thenReturn(directions);
+        when(slackUserHandlerService.createSlackParsedCommand(userFrom.getSlackUser(), ""))
+                .thenReturn(new SlackParsedCommand(userFrom, "", usersInText));
+        String expected = String.format("The keeper %s has active directions: [direction1]",
+                SlackParsedCommand.wrapSlackUserInFullPattern(userFrom.getSlackUser()));
 
         //When
-        String result = keeperService.getMyDirections("@from");
+        String actual = keeperService.getMyDirections(userFrom.getSlackUser());
 
         //Then
-        assertEquals("The keeper @from has active directions: [direction1]", result);
+        assertEquals(expected, actual);
         verify(keeperRepository).getKeeperDirections(keeperRequest);
-        verify(slackNameHandlerService).createSlackParsedCommand("@from", "");
-        verifyNoMoreInteractions(slackNameHandlerService, keeperRepository);
+        verify(slackUserHandlerService).createSlackParsedCommand(userFrom.getSlackUser(), "");
+        verifyNoMoreInteractions(slackUserHandlerService, keeperRepository);
     }
 
     @Test
     public void getMyDirectionsShouldReturnEmptyResult() {
         //Given
-        usersInText.clear();
-        usersInText.add(new UserDTO("uuid0", "@from"));
+        usersInText.add(userFrom);
         String[] emptyArray = {};
-        KeeperRequest keeperRequest = new KeeperRequest("uuid0", "uuid0", "");
+        KeeperRequest keeperRequest = new KeeperRequest(userFrom.getUuid(), userFrom.getUuid(), "");
         when(keeperRepository.getKeeperDirections(keeperRequest)).thenReturn(emptyArray);
-        when(slackNameHandlerService.createSlackParsedCommand("@from", ""))
-                .thenReturn(new SlackParsedCommand(fromUser, "", usersInText));
+        when(slackUserHandlerService.createSlackParsedCommand(userFrom.getSlackUser(), ""))
+                .thenReturn(new SlackParsedCommand(userFrom, "", usersInText));
+        String expected = String.format("The keeper %s has no active directions.",
+                SlackParsedCommand.wrapSlackUserInFullPattern(userFrom.getSlackUser()));
+
 
         //When
-        String result = keeperService.getMyDirections("@from");
+        String actual = keeperService.getMyDirections(userFrom.getSlackUser());
 
         //Then
-        assertEquals("The keeper @from has no active directions.", result);
+        assertEquals(expected, actual);
         verify(keeperRepository).getKeeperDirections(keeperRequest);
-        verify(slackNameHandlerService).createSlackParsedCommand("@from", "");
+        verify(slackUserHandlerService).createSlackParsedCommand(userFrom.getSlackUser(), "");
     }
 }

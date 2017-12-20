@@ -25,6 +25,7 @@ import java.io.PrintWriter;
  * @author Dmitriy Lyashenko
  * @author Konstantin Sergey
  * @author Ivan Shapovalov
+ * @author Oleksii Skachkov
  */
 @RestController
 @RequestMapping(value = "${keepers.slackBot.rest.api.version}" + "${keepers.slackBot.baseCommandsUrl}")
@@ -39,30 +40,29 @@ public class KeepersSlackCommandController {
     private RestTemplate restTemplate;
 
     @Inject
-    public KeepersSlackCommandController(KeeperService keeperService,
-                                         RestTemplate restTemplate) {
+    public KeepersSlackCommandController(KeeperService keeperService, RestTemplate restTemplate) {
         this.keeperService = keeperService;
         this.restTemplate = restTemplate;
     }
 
     @PostMapping(value = "${keepers.slackBot.endpoint.keeperAdd}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public void addKeeper(@RequestParam("token") String token,
-                          @RequestParam("user_name") String fromUser,
+                          @RequestParam("user_id") String fromSlackUser,
                           @RequestParam("text") String text,
                           @RequestParam("response_url") String responseUrl,
                           HttpServletResponse httpServletResponse) throws IOException {
         try {
             logger.debug("Received slash command KeeperAdd: from user: [{}] command: [{}] token: [{}] responseUrl: [{}]",
-                    fromUser, text, token, responseUrl);
+                    fromSlackUser, text, token, responseUrl);
 
             if (!token.equals(slackToken)) {
-                logger.warn("Received invalid slack token: [{}] in command KeeperAdd for user: [{}]", token, fromUser);
+                logger.warn("Received invalid slack token: [{}] in command KeeperAdd for user: [{}]", token, fromSlackUser);
                 sendQuickResponse(httpServletResponse, SORRY_MESSAGE);
             } else {
                 sendQuickResponse(httpServletResponse, IN_PROGRESS);
-                String response = keeperService.sendKeeperAddRequest(fromUser, text);
+                String response = keeperService.sendKeeperAddRequest(fromSlackUser, text);
                 logger.info("KeeperAdd command processed : user: [{}] text: [{}] and sent response into slack: [{}]",
-                        fromUser, text, response);
+                        fromSlackUser, text, response);
                 sendDelayedResponse(responseUrl, response);
             }
         } catch (BaseBotException bex) {
@@ -74,22 +74,22 @@ public class KeepersSlackCommandController {
 
     @PostMapping(value = "${keepers.slackBot.endpoint.keeperDeactivate}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public void deactivateKeeper(@RequestParam("token") String token,
-                                 @RequestParam("user_name") String fromUser,
+                                 @RequestParam("user_id") String fromSlackUser,
                                  @RequestParam("text") String text,
                                  @RequestParam("response_url") String responseUrl,
                                  HttpServletResponse httpServletResponse) {
         try {
             logger.debug("Received slash command KeeperDeactivate: from user: [{}] command: [{}] token: [{}]",
-                    fromUser, text, token);
+                    fromSlackUser, text, token);
 
             if (!token.equals(slackToken)) {
-                logger.warn("Received invalid slack token: [{}] in command KeeperDeactivate for user: [{}]", token, fromUser);
+                logger.warn("Received invalid slack token: [{}] in command KeeperDeactivate for user: [{}]", token, fromSlackUser);
                 sendQuickResponse(httpServletResponse, SORRY_MESSAGE);
             } else {
                 sendQuickResponse(httpServletResponse, IN_PROGRESS);
-                String response = keeperService.sendKeeperDeactivateRequest(fromUser, text);
+                String response = keeperService.sendKeeperDeactivateRequest(fromSlackUser, text);
                 logger.info("KeeperDeactivate command processed : user: [{}] text: [{}] and sent response into slack: [{}]",
-                        fromUser, text, response);
+                        fromSlackUser, text, response);
                 sendDelayedResponse(responseUrl, response);
             }
         } catch (BaseBotException bex) {
@@ -101,23 +101,23 @@ public class KeepersSlackCommandController {
 
     @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public void getKeeperDirections(@RequestParam("token") String token,
-                                    @RequestParam("user_name") String fromUser,
+                                    @RequestParam("user_id") String fromSlackUser,
                                     @RequestParam("text") String text,
                                     @RequestParam("response_url") String responseUrl,
                                     HttpServletResponse httpServletResponse) {
         try {
             logger.debug("Received slash command GetKeeperDirections: from user: [{}] command: [{}] token: [{}]",
-                    fromUser, text, token);
+                    fromSlackUser, text, token);
 
             if (!token.equals(slackToken)) {
                 logger.warn("Received invalid slack token: [{}] in command getKeeperDirections for user: [{}]", token,
-                        fromUser);
+                        fromSlackUser);
                 sendQuickResponse(httpServletResponse, SORRY_MESSAGE);
             } else {
                 sendQuickResponse(httpServletResponse, IN_PROGRESS);
-                String response = keeperService.getKeeperDirections(fromUser, text);
+                String response = keeperService.getKeeperDirections(fromSlackUser, text);
                 logger.info("GetKeeperDirections command processed : user: [{}] text: [{}] and sent response to slack: [{}]",
-                        fromUser, text, response);
+                        fromSlackUser, text, response);
                 sendDelayedResponse(responseUrl, response);
             }
         } catch (BaseBotException bex) {
@@ -127,22 +127,22 @@ public class KeepersSlackCommandController {
         }
     }
 
-    @PostMapping(value = "${keepers.slackBot.endpoint.getMyDirections}", consumes = MediaType
-            .APPLICATION_FORM_URLENCODED_VALUE)
+    @PostMapping(value = "${keepers.slackBot.endpoint.getMyDirections}",
+            consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public void getMyDirections(@RequestParam("token") String token,
-                                @RequestParam("user_name") String fromUser,
+                                @RequestParam("user_id") String fromSlackUser,
                                 @RequestParam("response_url") String responseUrl,
                                 HttpServletResponse httpServletResponse) {
         try {
-            logger.debug("Received slash command GetMyDirections: from user: [{}] token: [{}]", fromUser, token);
+            logger.debug("Received slash command GetMyDirections: from user: [{}] token: [{}]", fromSlackUser, token);
             if (!token.equals(slackToken)) {
-                logger.warn("Received invalid slack token: [{}] in command getMyDirections for user: [{}]", token, fromUser);
+                logger.warn("Received invalid slack token: [{}] in command getMyDirections for user: [{}]", token, fromSlackUser);
                 sendQuickResponse(httpServletResponse, SORRY_MESSAGE);
             } else {
                 sendQuickResponse(httpServletResponse, IN_PROGRESS);
-                String response = keeperService.getMyDirections(fromUser);
+                String response = keeperService.getMyDirections(fromSlackUser);
                 logger.info("GetMyDirections command processed : user: [{}] and sent response to slack: [{}]",
-                        fromUser, response);
+                        fromSlackUser, response);
                 sendDelayedResponse(responseUrl, response);
             }
         } catch (BaseBotException bex) {

@@ -6,18 +6,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ua.com.juja.microservices.keepers.slackbot.exception.WrongCommandFormatException;
 import ua.com.juja.microservices.keepers.slackbot.model.dto.UserDTO;
-import ua.com.juja.microservices.keepers.slackbot.utils.Utils;
 
 import java.util.List;
 
 /**
  * @author Konstantin Sergey
+ * @author Oleksii Skachkov
  */
-@ToString(exclude = {"slackNamePattern", "logger"})
+@ToString(exclude = {"logger"})
 @EqualsAndHashCode
 public class SlackParsedCommand {
+    public static final String SLACK_USER_PATTERN = "\\<@(.*?)(\\||\\>)";
+    public static final String SLACK_USER_FULL_PATTERN = "\\<@(.*?)(\\>)";
+    public static final String SLACK_USER_WRAPPER_FULL_PATTERN = "<@%s>";
+    public static final String SLACK_USER_WRAPPER_PARTIAL_PATTERN = "<@%1$s|%1$s>";
+
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
-    private String slackNamePattern;
     private UserDTO fromUser;
     private String text;
     private List<UserDTO> usersInText;
@@ -26,13 +30,16 @@ public class SlackParsedCommand {
         this.fromUser = fromUser;
         this.text = text;
         this.usersInText = usersInText;
-        slackNamePattern = Utils.getProperty(
-                "application.properties",
-                "keepers.slackNamePattern"
-        );
-        logger.debug("SlackParsedCommand created with parameters: " +
-                        "fromSlackName: {} text: {} userCountInText {} users: {}",
+        logger.debug("SlackParsedCommand created with parameters: fromSlackUser : {} text: {} userCountInText {} users: {}",
                 fromUser, text, usersInText.size(), usersInText.toString());
+    }
+
+    public static String wrapSlackUserInFullPattern(String slackUser) {
+        return String.format(SLACK_USER_WRAPPER_FULL_PATTERN, slackUser);
+    }
+
+    public static String wrapSlackUserInPartialPattern(String slackUser) {
+        return String.format(SLACK_USER_WRAPPER_PARTIAL_PATTERN, slackUser);
     }
 
     public List<UserDTO> getAllUsersFromText() {
@@ -41,15 +48,15 @@ public class SlackParsedCommand {
 
     public UserDTO getFirstUserFromText() {
         if (usersInText.size() == 0) {
-            logger.warn("The text: '{}' doesn't contain any slack names", text);
-            throw new WrongCommandFormatException(String.format("The text '%s' doesn't contain any slack names", text));
+            logger.warn("The text: '{}' doesn't contain any slack users", text);
+            throw new WrongCommandFormatException(String.format("The text '%s' doesn't contain any slack users", text));
         } else {
             return usersInText.get(0);
         }
     }
 
-    public String getTextWithoutSlackNames() {
-        String result = text.replaceAll(slackNamePattern, "");
+    public String getTextWithoutSlackUsers() {
+        String result = text.replaceAll(SLACK_USER_FULL_PATTERN, "");
         result = result.replaceAll("\\s+", " ").trim();
         return result;
     }

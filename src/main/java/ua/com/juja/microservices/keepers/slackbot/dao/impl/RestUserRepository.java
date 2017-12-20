@@ -3,6 +3,7 @@ package ua.com.juja.microservices.keepers.slackbot.dao.impl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -12,7 +13,7 @@ import org.springframework.web.client.RestTemplate;
 import ua.com.juja.microservices.keepers.slackbot.dao.UserRepository;
 import ua.com.juja.microservices.keepers.slackbot.exception.ApiError;
 import ua.com.juja.microservices.keepers.slackbot.exception.UserExchangeException;
-import ua.com.juja.microservices.keepers.slackbot.model.dto.SlackNameRequest;
+import ua.com.juja.microservices.keepers.slackbot.model.dto.SlackUserRequest;
 import ua.com.juja.microservices.keepers.slackbot.model.dto.UserDTO;
 
 import javax.inject.Inject;
@@ -22,6 +23,7 @@ import java.util.List;
 /**
  * @author Nikolay Horushko
  * @author Dmitriy Lyashenko
+ * @author Oleksii Skachkov
  */
 @Repository
 public class RestUserRepository extends AbstractRestRepository implements UserRepository {
@@ -33,7 +35,7 @@ public class RestUserRepository extends AbstractRestRepository implements UserRe
     private String urlBase;
     @Value("${users.rest.api.version}")
     private String version;
-    @Value("${users.endpoint.usersBySlackNames}")
+    @Value("${users.endpoint.usersBySlackUsers}")
     private String urlGetUsers;
 
     @Inject
@@ -42,19 +44,11 @@ public class RestUserRepository extends AbstractRestRepository implements UserRe
     }
 
     @Override
-    public List<UserDTO> findUsersBySlackNames(List<String> slackNames) {
-        logger.debug("Received SlackNames : [{}]", slackNames);
+    public List<UserDTO> findUsersBySlackUsers(List<String> slackUsers) {
+        logger.debug("Received SlackUsers : [{}]", slackUsers);
 
-        for (int i = 0; i < slackNames.size(); i++) {
-            if (!slackNames.get(i).startsWith("@")) {
-                logger.debug("add '@' to SlackName : [{}]", slackNames.get(i));
-                String slackName = slackNames.get(i);
-                slackNames.set(i, "@" + slackName);
-            }
-        }
-
-        SlackNameRequest slackNameRequest = new SlackNameRequest(slackNames);
-        HttpEntity<SlackNameRequest> request = new HttpEntity<>(slackNameRequest, setupBaseHttpHeaders());
+        SlackUserRequest slackUserRequest = new SlackUserRequest(slackUsers);
+        HttpEntity<SlackUserRequest> request = new HttpEntity<>(slackUserRequest, setupBaseHttpHeaders());
 
         List<UserDTO> result;
         try {
@@ -69,7 +63,7 @@ public class RestUserRepository extends AbstractRestRepository implements UserRe
             throw new UserExchangeException(error, ex);
         }
 
-        logger.info("Got UserDTO:{} by users: {}", result, slackNames);
+        logger.info("Got UserDTO:{} by users: {}", result, slackUsers);
         return result;
     }
 }
